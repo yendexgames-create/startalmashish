@@ -433,7 +433,10 @@ bot.on('contact', async (ctx) => {
         );
 
         db.run(
-          'UPDATE users SET invited_friends_count = invited_friends_count + 1, slots = MIN(slots + 2, 3) WHERE telegram_id = ?',
+          `UPDATE users
+           SET invited_friends_count = invited_friends_count + 1,
+               slots = MIN(1 + 2 * ((invited_friends_count + 1) / 5), 3)
+           WHERE telegram_id = ?`,
           [referrerId],
           (err) => {
             if (err) {
