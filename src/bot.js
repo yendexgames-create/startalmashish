@@ -624,7 +624,7 @@ bot.on('text', async (ctx) => {
     const referralLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
 
     let msg = '👥 Do‘st taklif qilish\n\n';
-    msg += 'Quyidagi referal linkingizni do‘stlaringizga yuboring. Ular shu link orqali botga kirib ro‘yxatdan o‘tsa, sizning takliflaringiz soni oshadi.Agar siz 5 tadan oshiq dost taklif qilsangiz siz uchun yangi 2 ta skon ochiladi link qoyish uchun.\n\n';
+    msg += 'Quyidagi referal linkingizni do‘stlaringizga yuboring. Ular shu link orqali botga kirib ro‘yxatdan o‘tsa, sizning takliflaringiz soni oshadi.Agar siz 5 tadan oshiq dost taklif qilsangiz siz uchun yangi 2 ta slot ochiladi link qoyish uchun.\n\n';
     msg += `Sizning linkingiz: ${referralLink}`;
 
     await ctx.reply(msg, mainMenuKeyboard());
