@@ -6,11 +6,11 @@
   "scripts": {
     "start": "node src/all_bots.js"
   },
-  "dependencies": {
+ "dependencies": {
   "dotenv": "^16.4.5",
   "mongodb": "^7.0.0",
   "sqlite3": "^5.1.7",
   "telegraf": "^4.16.3",
-  "socks": "2.8.7"
+  "socks": "^2.8.6"
 }
 }
