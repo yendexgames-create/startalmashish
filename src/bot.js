@@ -91,32 +91,8 @@ async function requireSubscription(ctx) {
     return false;
   }
 
-  // Agar channels jadvali bo'sh bo'lsa, eski bitta-kanalli rejimdan foydalanamiz
-  let channel = REQUIRED_CHANNEL;
-  try {
-    const stored = await getSetting('required_channel');
-    if (stored) channel = stored;
-  } catch (e) {
-    // ignore, fallback sifatida .env dagisi qoladi
-  }
-
-  if (!channel) return true;
-
-  try {
-    const member = await ctx.telegram.getChatMember(channel, telegramId);
-    const status = member.status;
-    if (['member', 'administrator', 'creator'].includes(status)) {
-      return true;
-    }
-  } catch (e) {
-    console.error('Kanalga obuna tekshiruvda xatolik:', e);
-  }
-
-  await ctx.reply(
-    'Botdan foydalanish uchun avval quyidagi kanalga obuna bo‘ling, so‘ng "✅ Tekshirish" tugmasini bosing.',
-    channelCheckKeyboard(channel)
-  );
-  return false;
+  // Agar channels jadvalidan hech qanday kanal topilmasa, hozircha obunani majburiy qilmaymiz
+  return true;
 }
 
 function setState(userId, state, data = {}) {
