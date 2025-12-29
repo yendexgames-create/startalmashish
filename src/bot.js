@@ -1,6 +1,6 @@
 import { Telegraf, Markup } from 'telegraf';
 import { BOT_TOKEN, REQUIRED_CHANNEL } from './config.js';
-import { db, initDb, getSetting, getChannels, recordChannelJoin } from './db.js';
+import { db, initDb, getSetting, getChannels, recordChannelJoin, upsertUserLink, getUserLinks } from './db.js';
 
 initDb();
 
@@ -11,6 +11,7 @@ const userStates = new Map();
 const currentCandidates = new Map();
 const previousCandidates = new Map();
 const seenCandidates = new Map(); // telegramId -> Set of candidate telegram_ids
+const searchSlots = new Map(); // telegramId -> tanlangan slot index (1..3)
 const activeExchanges = new Map(); // telegramId -> exchangeId
 
 function channelCheckKeyboard(channel) {
@@ -381,20 +382,6 @@ bot.action('check_sub', async (ctx) => {
     await ctx.answerCbQuery('Hali obuna bo‘lmadingiz.');
   }
 });
-
-bot.action('change_link', async (ctx) => {
-  const telegramId = ctx.from.id;
-  const user = await findUserByTelegramId(telegramId);
-  if (!user) {
-    await ctx.answerCbQuery();
-    return;
-  }
-
-  await ctx.answerCbQuery();
-  await ctx.reply('Yangi bot/link manzilingizni yuboring (https:// bilan boshlansin).', Markup.removeKeyboard());
-  setState(telegramId, 'WAIT_NEW_LINK');
-});
-
 bot.on('contact', async (ctx) => {
   const telegramId = ctx.from.id;
   const state = getState(telegramId);
@@ -445,11 +432,11 @@ bot.on('contact', async (ctx) => {
         );
 
         db.run(
-          'UPDATE users SET invited_friends_count = invited_friends_count + 1 WHERE telegram_id = ?',
+          'UPDATE users SET invited_friends_count = invited_friends_count + 1, slots = MIN(slots + 2, 3) WHERE telegram_id = ?',
           [referrerId],
           (err) => {
             if (err) {
-              console.error('invited_friends_count yangilashda xato:', err);
+              console.error('invited_friends_count/slots yangilashda xato:', err);
             }
           }
         );
@@ -461,6 +448,29 @@ bot.on('contact', async (ctx) => {
     'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi esa start almashish uchun ishlatiladigan bot linkingizni yuboring.\nMasalan: https://t.me/yourbot?start=... ',
     Markup.removeKeyboard()
   );
+
+  // Agar referal orqali kelgan bo'lsa, taklif qilgan odamga xabar yuboramiz
+  if (referrerId) {
+    const invitedName = name || '-';
+    const invitedUsername = username ? '@' + username : '-';
+
+    const inviterText =
+      '🎉 Sizning referal linkingiz orqali yangi foydalanuvchi botga qo‘shildi.\n' +
+      `Ism: ${invitedName}\n` +
+      `Username: ${invitedUsername}\n\n` +
+      'Bu taklif uchun sizga 2 ta yangi slot ochildi.\n\n' +
+      'Profilingizdan yangi slotlar uchun link qo‘shishingiz mumkin.';
+
+    try {
+      await bot.telegram.sendMessage(
+        referrerId,
+        inviterText,
+        Markup.inlineKeyboard([[Markup.button.callback('👤 Profilga o‘tish', 'open_profile')]])
+      );
+    } catch (e) {
+      // agar xabar yuborishda xato bo'lsa, bot ishini to'xtatmaymiz
+    }
+  }
 
   setState(telegramId, 'WAIT_LINK');
 });
@@ -537,22 +547,39 @@ bot.on('text', async (ctx) => {
       return;
     }
 
-    if (!user.main_link) {
+    // Foydalanuvchining slot-linklarini olamiz
+    let links = [];
+    try {
+      links = await getUserLinks(telegramId);
+    } catch (e) {
+      console.error('user_links o‘qishda xato (search):', e);
+    }
+
+    // Faqat mavjud slotlar va linki borlarini hisobga olamiz (1..3)
+    const availableSlots = [];
+    for (let i = 1; i <= Math.min(user.slots || 1, 3); i++) {
+      const slot = links.find((l) => l.slot_index === i && l.link);
+      if (slot) {
+        availableSlots.push({ index: i, link: slot.link });
+      }
+    }
+
+    if (!availableSlots.length) {
       await ctx.reply(
-        'Avval almashish uchun bot/link manzilingizni kiriting. /start buyrug‘ini yuboring.',
-        Markup.removeKeyboard()
+        'Hali hech bir slotingiz uchun link kiritilmagan. Avval profilga kirib kamida 1-slot uchun link qo‘ying.',
+        mainMenuKeyboard()
       );
-      setState(telegramId, 'WAIT_LINK');
       return;
     }
 
-    // Yangi sessiya: ko'rilgan kandidatlar ro'yxatini tozalaymiz
-    seenCandidates.set(telegramId, new Set());
-    previousCandidates.delete(telegramId);
+    const buttons = availableSlots.map((s) => [
+      Markup.button.callback(`${s.index}-slot: ${s.link}`, `slot_search_${s.index}`)
+    ]);
 
-    const exclude = [];
-    const candidate = await getRandomCandidateForUser(telegramId, exclude);
-    await showCandidate(ctx, user, candidate);
+    await ctx.reply(
+      'Qaysi slot uchun almashish topmoqchisiz? Slotni tanlang:',
+      Markup.inlineKeyboard(buttons)
+    );
     return;
   }
 
@@ -631,9 +658,48 @@ bot.on('text', async (ctx) => {
     msg += `Taklif qilgan do‘stlar soni: ${user.invited_friends_count || 0}\n`;
     msg += `Slotlar: ${user.used_slots || 0}/${user.slots || 1}`;
 
-    const kb = Markup.inlineKeyboard([
-      [Markup.button.callback('🔁 Linkni almashtirish', 'change_link')]
+    // Userning slot-linklarini tekshiramiz
+    let links = [];
+    try {
+      links = await getUserLinks(telegramId);
+    } catch (e) {
+      console.error('user_links o‘qishda xato:', e);
+    }
+
+    const slot1 = links.find((l) => l.slot_index === 1);
+    const slot2 = links.find((l) => l.slot_index === 2);
+    const slot3 = links.find((l) => l.slot_index === 3);
+
+    const buttons = [];
+    // 1-slot uchun tugma: mavjud bo'lsa almashtirish, bo'lmasa qo'yish
+    buttons.push([
+      Markup.button.callback(
+        slot1 ? '1-slot linkni almashtirish' : '1-slot uchun link qo‘yish',
+        'slot1_set'
+      )
     ]);
+
+    // 2-slot uchun tugma: faqat slots >= 2 bo'lsa ma'noli
+    if (user.slots >= 2) {
+      buttons.push([
+        Markup.button.callback(
+          slot2 ? '2-slot linkni almashtirish' : '2-slot uchun link qo‘yish',
+          'slot2_set'
+        )
+      ]);
+    }
+
+    // 3-slot uchun tugma: faqat slots >= 3 bo'lsa
+    if (user.slots >= 3) {
+      buttons.push([
+        Markup.button.callback(
+          slot3 ? '3-slot linkni almashtirish' : '3-slot uchun link qo‘yish',
+          'slot3_set'
+        )
+      ]);
+    }
+
+    const kb = Markup.inlineKeyboard(buttons);
 
     await ctx.reply(msg, { ...mainMenuKeyboard(), ...kb });
     return;
@@ -876,8 +942,89 @@ bot.on('text', async (ctx) => {
 
     await updateUserLinkAndDescription(telegramId, link, description);
 
+    // 1-slot uchun user_links jadvalini ham yangilaymiz
+    try {
+      await upsertUserLink(telegramId, 1, link, description);
+    } catch (e) {
+      console.error('1-slot user_links yangilashda xato:', e);
+    }
+
     await ctx.reply(
       'Linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi start almashish va boshqa funksiyalardan foydalanishingiz mumkin.',
+      mainMenuKeyboard()
+    );
+
+    clearState(telegramId);
+    return;
+  }
+
+  // 3-slot uchun yangi link kiritish
+  if (state.state === 'WAIT_SLOT3_LINK') {
+    const link = text.trim();
+
+    if (!link.startsWith('http')) {
+      await ctx.reply('Iltimos, to‘g‘ri bot/link manzilini yuboring (https:// bilan).');
+      return;
+    }
+
+    await ctx.reply(
+      '3-slot uchun ham qisqacha tushuntiring: bu bot sizga nima uchun kerak va u nima qiladi?',
+      Markup.removeKeyboard()
+    );
+
+    setState(telegramId, 'WAIT_SLOT3_DESCRIPTION', { link });
+    return;
+  }
+
+  if (state.state === 'WAIT_SLOT3_DESCRIPTION') {
+    const { link } = state.data;
+    const description = text.trim();
+
+    try {
+      await upsertUserLink(telegramId, 3, link, description);
+    } catch (e) {
+      console.error('3-slot user_links yangilashda xato:', e);
+    }
+
+    await ctx.reply(
+      '3-slot linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi almashish jarayonida bu slottan ham foydalanish mumkin bo‘ladi.',
+      mainMenuKeyboard()
+    );
+
+    clearState(telegramId);
+    return;
+  }
+
+  // 2-slot uchun yangi link kiritish
+  if (state.state === 'WAIT_SLOT2_LINK') {
+    const link = text.trim();
+
+    if (!link.startsWith('http')) {
+      await ctx.reply('Iltimos, to‘g‘ri bot/link manzilini yuboring (https:// bilan).');
+      return;
+    }
+
+    await ctx.reply(
+      '2-slot uchun ham qisqacha tushuntiring: bu bot sizga nima uchun kerak va u nima qiladi?',
+      Markup.removeKeyboard()
+    );
+
+    setState(telegramId, 'WAIT_SLOT2_DESCRIPTION', { link });
+    return;
+  }
+
+  if (state.state === 'WAIT_SLOT2_DESCRIPTION') {
+    const { link } = state.data;
+    const description = text.trim();
+
+    try {
+      await upsertUserLink(telegramId, 2, link, description);
+    } catch (e) {
+      console.error('2-slot user_links yangilashda xato:', e);
+    }
+
+    await ctx.reply(
+      '2-slot linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi almashish jarayonida bu slottan ham foydalanish mumkin bo‘ladi.',
       mainMenuKeyboard()
     );
 
@@ -908,6 +1055,13 @@ bot.on('text', async (ctx) => {
 
     await updateUserLinkAndDescription(telegramId, link, description);
 
+    // 1-slot (asosiy slot) uchun link va descriptionni ham yangilaymiz
+    try {
+      await upsertUserLink(telegramId, 1, link, description);
+    } catch (e) {
+      console.error('1-slot user_links yangilashda xato (change_link):', e);
+    }
+
     await ctx.reply(
       'Yangi linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi start almashish va boshqa funksiyalardan yangilangan link bilan foydalanishingiz mumkin.',
       mainMenuKeyboard()
@@ -925,6 +1079,132 @@ bot.on('text', async (ctx) => {
   // Agar hech bir holatga tushmasa
   await ctx.reply('Asosiy menyudan birini tanlang yoki /start buyrug‘ini yuboring.', mainMenuKeyboard());
 })
+
+// Referal xabari ichidagi "👤 Profilga o‘tish" tugmasi uchun callback
+bot.action('open_profile', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  await ctx.answerCbQuery();
+
+  let msg = '👤 Profil maʼlumotlari:\n\n';
+  msg += `Ism: ${user.name || '-'}\n`;
+  msg += `Username: ${user.username ? '@' + user.username : '-'}\n`;
+  msg += `Telefon: ${user.phone || '-'}\n`;
+  msg += `Link: ${user.main_link || '-'}\n`;
+  msg += `Almashgan odamlar soni: ${user.total_exchanges || 0}\n`;
+  msg += `Taklif qilgan do‘stlar soni: ${user.invited_friends_count || 0}\n`;
+  msg += `Slotlar: ${user.used_slots || 0}/${user.slots || 1}`;
+
+  let links = [];
+  try {
+    links = await getUserLinks(telegramId);
+  } catch (e) {
+    console.error('user_links o‘qishda xato (open_profile):', e);
+  }
+
+  const slot1 = links.find((l) => l.slot_index === 1);
+  const slot2 = links.find((l) => l.slot_index === 2);
+
+  const buttons = [];
+  buttons.push([
+    Markup.button.callback(
+      slot1 ? '1-slot linkni almashtirish' : '1-slot uchun link qo‘yish',
+      'slot1_set'
+    )
+  ]);
+
+  if (user.slots >= 2) {
+    buttons.push([
+      Markup.button.callback(
+        slot2 ? '2-slot linkni almashtirish' : '2-slot uchun link qo‘yish',
+        'slot2_set'
+      )
+    ]);
+  }
+
+  if (user.slots >= 3) {
+    buttons.push([
+      Markup.button.callback(
+        slot3 ? '3-slot linkni almashtirish' : '3-slot uchun link qo‘yish',
+        'slot3_set'
+      )
+    ]);
+  }
+
+  const kb = Markup.inlineKeyboard(buttons);
+
+  await ctx.reply(msg, kb);
+});
+
+// 1-slot tugmasi change_link oqimini ishga tushiradi (asosiy linkni almashtirish)
+bot.action('slot1_set', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    '1-slot (asosiy) uchun yangi bot/link manzilingizni yuboring (https:// bilan boshlansin).',
+    Markup.removeKeyboard()
+  );
+  setState(telegramId, 'WAIT_NEW_LINK');
+});
+
+// 2-slot tugmasi yangi slot-link oqimini ishga tushiradi
+bot.action('slot2_set', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  if (user.slots < 2) {
+    await ctx.answerCbQuery('2-slot hali mavjud emas.');
+    return;
+  }
+
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    '2-slot uchun yangi bot/link manzilini yuboring (https:// bilan boshlansin).',
+    Markup.removeKeyboard()
+  );
+  setState(telegramId, 'WAIT_SLOT2_LINK');
+});
+
+// 3-slot tugmasi yangi slot-link oqimini ishga tushiradi
+bot.action('slot3_set', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  if (user.slots < 3) {
+    await ctx.answerCbQuery('3-slot hali mavjud emas.');
+    return;
+  }
+
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    '3-slot uchun yangi bot/link manzilini yuboring (https:// bilan boshlansin).',
+    Markup.removeKeyboard()
+  );
+  setState(telegramId, 'WAIT_SLOT3_LINK');
+});
 
 bot.on('photo', async (ctx) => {
   const telegramId = ctx.from.id;
@@ -1032,10 +1312,36 @@ bot.action('match_back', async (ctx) => {
   await showCandidate(ctx, user, candidate);
 });
 
+// Slot tanlash tugmalari: slot_search_1, slot_search_2, slot_search_3
+bot.action(/slot_search_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const slotIndex = parseInt(ctx.match[1], 10);
+
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  // Tanlangan slotni eslab qolamiz
+  searchSlots.set(telegramId, slotIndex);
+
+  // Yangi sessiya: ko‘rilgan kandidatlar ro‘yxatini tozalaymiz
+  seenCandidates.set(telegramId, new Set());
+  previousCandidates.delete(telegramId);
+
+  const exclude = [];
+  const candidate = await getRandomCandidateForUser(telegramId, exclude);
+
+  await ctx.answerCbQuery();
+  await showCandidate(ctx, user, candidate);
+});
+
 bot.action('match_yes', async (ctx) => {
   const telegramId = ctx.from.id;
   const user = await findUserByTelegramId(telegramId);
-  if (!user || !user.main_link) {
+  if (!user) {
     await ctx.answerCbQuery();
     return;
   }
@@ -1064,7 +1370,21 @@ bot.action('match_yes', async (ctx) => {
   const uName = user.name || '-';
   const uUsername = user.username ? '@' + user.username : '-';
   const uProfile = user.profile_link || (user.username ? `https://t.me/${user.username}` : '-');
-  const uLink = user.main_link || '-';
+
+  // Tanlangan slotning linkini aniqlaymiz (agar topilmasa, main_linkga qaytamiz)
+  let uLink = user.main_link || '-';
+  const chosenSlot = searchSlots.get(telegramId);
+  if (chosenSlot) {
+    try {
+      const links = await getUserLinks(telegramId);
+      const slotRow = links.find((l) => l.slot_index === chosenSlot && l.link);
+      if (slotRow && slotRow.link) {
+        uLink = slotRow.link;
+      }
+    } catch (e) {
+      console.error('Tanlangan slot linkini olishda xato:', e);
+    }
+  }
 
   const candidateText =
     `Kimdir siz bilan start almashmoqchi:
@@ -1073,7 +1393,8 @@ Ism: ${uName}
 Username: ${uUsername}
 Profil: ${uProfile}
 
-Bot/link manzili: ${uLink}
+Sizning quyidagi linkingiz uchun:
+${uLink}
 
 Rozimisiz?`;
 

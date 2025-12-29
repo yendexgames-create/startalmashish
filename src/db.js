@@ -85,6 +85,14 @@ export function initDb() {
       telegram_id INTEGER,
       PRIMARY KEY (channel_id, telegram_id)
     )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS user_links (
+      telegram_id INTEGER,
+      slot_index INTEGER,
+      link TEXT,
+      description TEXT,
+      PRIMARY KEY (telegram_id, slot_index)
+    )`);
   });
 }
 
@@ -103,6 +111,34 @@ export function setSetting(key, value) {
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       [key, value],
       (err) => {
+        if (err) return reject(err);
+        resolve();
+      }
+    );
+  });
+}
+
+export function getUserLinks(telegramId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'SELECT * FROM user_links WHERE telegram_id = ? ORDER BY slot_index ASC',
+      [telegramId],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
+export function upsertUserLink(telegramId, slotIndex, link, description) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO user_links (telegram_id, slot_index, link, description)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(telegram_id, slot_index) DO UPDATE SET link = excluded.link, description = excluded.description`,
+      [telegramId, slotIndex, link, description],
+      function (err) {
         if (err) return reject(err);
         resolve();
       }
