@@ -417,7 +417,8 @@ bot.on('contact', async (ctx) => {
       referrer_id: referrerId || null
     });
 
-    // Agar referal orqali kelgan bo'lsa, referrals jadvaliga yozamiz va referrer hisobini oshiramiz
+    // Agar referal orqali kelgan bo'lsa, referrals jadvaliga yozamiz, referrer hisobini oshiramiz
+    // va ularni do'stlar ro'yxatiga qo'shamiz
     if (referrerId) {
       const now = Date.now();
       db.serialize(() => {
@@ -437,6 +438,27 @@ bot.on('contact', async (ctx) => {
           (err) => {
             if (err) {
               console.error('invited_friends_count/slots yangilashda xato:', err);
+            }
+          }
+        );
+
+        // Do'stlikni ikki tomonga ham qo'shamiz (agar mavjud bo'lmasa)
+        db.run(
+          'INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?) ON CONFLICT(user_id, friend_id) DO NOTHING',
+          [referrerId, telegramId, now],
+          (err) => {
+            if (err) {
+              console.error('friendships (referrer->new) qo\'shishda xato:', err);
+            }
+          }
+        );
+
+        db.run(
+          'INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?) ON CONFLICT(user_id, friend_id) DO NOTHING',
+          [telegramId, referrerId, now],
+          (err) => {
+            if (err) {
+              console.error('friendships (new->referrer) qo\'shishda xato:', err);
             }
           }
         );
@@ -706,7 +728,7 @@ bot.on('text', async (ctx) => {
   }
 
   if (text === '✉️ Savol va takliflar') {
-    await ctx.reply('Savol va takliflaringizni shu yerga yozib qoldiring. (Admin uchun aloqa: @your_username)');
+    await ctx.reply('Savol va takliflaringizni shu yerga yozib qoldiring. (Admin uchun aloqa: @Cyberphantom001)');
     return;
   }
 
