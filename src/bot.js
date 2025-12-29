@@ -178,14 +178,14 @@ function addScreenshot(exchangeId, userId, fileId) {
   });
 }
 
-function createUser({ telegram_id, phone, name, username, profile_link }) {
+function createUser({ telegram_id, phone, name, username, profile_link, referrer_id = null }) {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO users (telegram_id, phone, name, username, profile_link) VALUES (?, ?, ?, ?, ?)`,
-      [telegram_id, phone, name, username, profile_link],
+      `INSERT INTO users (telegram_id, phone, name, username, profile_link, referrer_id) VALUES (?, ?, ?, ?, ?, ?)`,
+      [telegram_id, phone, name, username, profile_link, referrer_id],
       function (err) {
         if (err) return reject(err);
-        resolve({ id: this.lastID, telegram_id, phone, name, username, profile_link });
+        resolve({ id: this.lastID, telegram_id, phone, name, username, profile_link, referrer_id });
       }
     );
   });
@@ -338,6 +338,16 @@ function updateUserLinkAndDescription(telegramId, link, description) {
 bot.start(async (ctx) => {
   const telegramId = ctx.from.id;
 
+  // Referal payload: /start ref_123456
+  let referrerId = null;
+  const payload = ctx.startPayload;
+  if (payload && typeof payload === 'string' && payload.startsWith('ref_')) {
+    const idPart = parseInt(payload.slice(4), 10);
+    if (!Number.isNaN(idPart) && idPart !== telegramId) {
+      referrerId = idPart;
+    }
+  }
+
   const ok = await requireSubscription(ctx);
   if (!ok) return;
 
@@ -348,7 +358,8 @@ bot.start(async (ctx) => {
       'Start almashish botiga xush kelibsiz!\n\nRo‘yxatdan o‘tish uchun telefon raqamingizni yuboring.',
       startRegistrationKeyboard()
     );
-    setState(telegramId, 'WAIT_PHONE');
+    // referrerId bo'lsa, keyingi bosqichda saqlash uchun state'ga qo'yamiz
+    setState(telegramId, 'WAIT_PHONE', { referrerId });
   } else if (!existing.main_link) {
     await ctx.reply(
       'Siz ro‘yxatdan o‘tgansiz, lekin hali almashish linkini kiritmagansiz.\nIltimos, bot linkingizni yuboring (masalan, https://t.me/yourbot?start=...).',
@@ -406,6 +417,8 @@ bot.on('contact', async (ctx) => {
   const username = ctx.from.username || null;
   const profile_link = username ? `https://t.me/${username}` : null;
 
+  const referrerId = state && state.data ? state.data.referrerId : null;
+
   let user = await findUserByTelegramId(telegramId);
   if (!user) {
     user = await createUser({
@@ -413,8 +426,35 @@ bot.on('contact', async (ctx) => {
       phone,
       name,
       username,
-      profile_link
+      profile_link,
+      referrer_id: referrerId || null
     });
+
+    // Agar referal orqali kelgan bo'lsa, referrals jadvaliga yozamiz va referrer hisobini oshiramiz
+    if (referrerId) {
+      const now = Date.now();
+      db.serialize(() => {
+        db.run(
+          'INSERT INTO referrals (referrer_id, new_user_id, created_at) VALUES (?, ?, ?)',
+          [referrerId, telegramId, now],
+          (err) => {
+            if (err) {
+              console.error('Referral yozishda xato:', err);
+            }
+          }
+        );
+
+        db.run(
+          'UPDATE users SET invited_friends_count = invited_friends_count + 1 WHERE telegram_id = ?',
+          [referrerId],
+          (err) => {
+            if (err) {
+              console.error('invited_friends_count yangilashda xato:', err);
+            }
+          }
+        );
+      });
+    }
   }
 
   await ctx.reply(
