@@ -1,0 +1,1386 @@
+import { Telegraf, Markup } from 'telegraf';
+import { BOT_TOKEN, REQUIRED_CHANNEL } from './config.js';
+import { db, initDb, getSetting, getChannels, recordChannelJoin } from './db.js';
+
+initDb();
+
+const bot = new Telegraf(BOT_TOKEN);
+
+// In-memory state for simple step-by-step flow
+const userStates = new Map();
+const currentCandidates = new Map();
+const previousCandidates = new Map();
+const seenCandidates = new Map(); // telegramId -> Set of candidate telegram_ids
+const activeExchanges = new Map(); // telegramId -> exchangeId
+
+function channelCheckKeyboard(channel) {
+  const channelLink = `https://t.me/${channel.replace('@', '')}`;
+  return Markup.inlineKeyboard([
+    [Markup.button.url('📢 Kanalga o‘tish', channelLink)],
+    [Markup.button.callback('✅ Tekshirish', 'check_sub')]
+  ]);
+}
+
+function multiChannelKeyboard(channels) {
+  const rows = [];
+
+  channels.forEach((ch, idx) => {
+    const name = ch.name || `Kanal ${idx + 1}`;
+    const link = ch.link || (ch.name ? `https://t.me/${ch.name.replace('@', '')}` : null);
+    if (!link) return;
+
+    rows.push([Markup.button.url(name, link)]);
+  });
+
+  rows.push([Markup.button.callback('✅ Tekshirish', 'check_sub')]);
+
+  return Markup.inlineKeyboard(rows);
+}
+
+async function requireSubscription(ctx) {
+  const telegramId = ctx.from && ctx.from.id;
+  if (!telegramId) return true;
+
+  // Avval ko'p kanalli konfiguratsiyani (channels jadvali) tekshiramiz
+  let channels = [];
+  try {
+    channels = await getChannels();
+  } catch (e) {
+    // agar xatolik bo'lsa, pastdagi eski bitta-kanalli rejimga o'tamiz
+  }
+
+  if (channels && channels.length > 0) {
+    const notSubscribed = [];
+
+    for (const ch of channels) {
+      const chatId = ch.name || ch.link;
+      if (!chatId) continue;
+
+      try {
+        const member = await ctx.telegram.getChatMember(chatId, telegramId);
+        const status = member.status;
+        if (!['member', 'administrator', 'creator'].includes(status)) {
+          notSubscribed.push(ch);
+        }
+      } catch (e) {
+        console.error('Kanalga obuna tekshiruvda xatolik (multi-kanal):', chatId, e.description || e.message || e);
+        // Agar chat topilmasa, bu kanalni talab qilmaymiz
+        if (e && e.response && e.response.error_code === 400) {
+          continue;
+        }
+        notSubscribed.push(ch);
+      }
+    }
+
+    if (notSubscribed.length === 0) {
+      // Birinchi muvaffaqiyatli o'tishda joined_count ni oshirish
+      try {
+        for (const ch of channels) {
+          await recordChannelJoin(ch.id, telegramId);
+        }
+      } catch (e) {
+        console.error('recordChannelJoin xatosi:', e);
+      }
+
+      return true;
+    }
+
+    let msg = 'Botdan foydalanish uchun quyidagi kanallarga obuna bo‘lishingiz kerak:';
+
+    await ctx.reply(msg, multiChannelKeyboard(notSubscribed));
+    return false;
+  }
+
+  // Agar channels jadvali bo'sh bo'lsa, eski bitta-kanalli rejimdan foydalanamiz
+  let channel = REQUIRED_CHANNEL;
+  try {
+    const stored = await getSetting('required_channel');
+    if (stored) channel = stored;
+  } catch (e) {
+    // ignore, fallback sifatida .env dagisi qoladi
+  }
+
+  if (!channel) return true;
+
+  try {
+    const member = await ctx.telegram.getChatMember(channel, telegramId);
+    const status = member.status;
+    if (['member', 'administrator', 'creator'].includes(status)) {
+      return true;
+    }
+  } catch (e) {
+    console.error('Kanalga obuna tekshiruvda xatolik:', e);
+  }
+
+  await ctx.reply(
+    'Botdan foydalanish uchun avval quyidagi kanalga obuna bo‘ling, so‘ng "✅ Tekshirish" tugmasini bosing.',
+    channelCheckKeyboard(channel)
+  );
+  return false;
+}
+
+function setState(userId, state, data = {}) {
+  userStates.set(userId, { state, data });
+}
+
+function getState(userId) {
+  return userStates.get(userId) || { state: null, data: {} };
+}
+
+function clearState(userId) {
+  userStates.delete(userId);
+}
+
+function mainMenuKeyboard() {
+  return Markup.keyboard([
+    ['🔁 Almashishni topish'],
+    ['👥 Do‘st taklif qilish', '📚 Do‘stlar'],
+    ['👤 Profil', '✉️ Savol va takliflar']
+  ]).resize();
+}
+
+function exchangeWaitingKeyboard() {
+  return Markup.keyboard([['🚪 Chiqib ketish']]).resize();
+}
+
+function screenshotPhaseKeyboard() {
+  return Markup.keyboard([
+    ['📸 Screenshot yubormoqchiman'],
+    ['✅ Qabul qilindi', '⏳ Kelmadi hali', '🚪 Chiqib ketish']
+  ]).resize();
+}
+
+function helpChatKeyboard() {
+  return Markup.keyboard([
+    ['⏳ Kelmadi hali', '🚪 Chiqib ketish'],
+    ['🔚 Suhbatni yakunlash']
+  ]).resize();
+}
+
+function startRegistrationKeyboard() {
+  return Markup.keyboard([
+    Markup.button.contactRequest('📱 Telefon raqamni yuborish')
+  ]).resize();
+}
+
+// Helpers: get or create user in DB
+function findUserByTelegramId(telegramId) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId], (err, row) => {
+      if (err) return reject(err);
+      resolve(row || null);
+    });
+  });
+}
+
+function getFriendsForUser(telegramId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT u.* FROM friendships f
+       JOIN users u ON f.friend_id = u.telegram_id
+       WHERE f.user_id = ?`,
+      [telegramId],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
+function addScreenshot(exchangeId, userId, fileId) {
+  const now = Date.now();
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO exchange_screenshots (exchange_id, user_id, file_id, created_at) VALUES (?, ?, ?, ?)`,
+      [exchangeId, userId, fileId, now],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function createUser({ telegram_id, phone, name, username, profile_link }) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO users (telegram_id, phone, name, username, profile_link) VALUES (?, ?, ?, ?, ?)`,
+      [telegram_id, phone, name, username, profile_link],
+      function (err) {
+        if (err) return reject(err);
+        resolve({ id: this.lastID, telegram_id, phone, name, username, profile_link });
+      }
+    );
+  });
+}
+
+function createExchange(user1Id, user2Id) {
+  const now = Date.now();
+  const deadline = now + 48 * 60 * 60 * 1000; // 48 soat
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO exchanges (user1_id, user2_id, status, created_at, deadline) VALUES (?, ?, 'pending_partner', ?, ?)`,
+      [user1Id, user2Id, now, deadline],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function updateExchange(id, fields) {
+  const keys = Object.keys(fields);
+  const values = Object.values(fields);
+  const setClause = keys.map((k) => `${k} = ?`).join(', ');
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE exchanges SET ${setClause} WHERE id = ?`,
+      [...values, id],
+      function (err) {
+        if (err) return reject(err);
+        resolve();
+      }
+    );
+  });
+}
+
+function getExchangeById(id) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM exchanges WHERE id = ?', [id], (err, row) => {
+      if (err) return reject(err);
+      resolve(row || null);
+    });
+  });
+}
+
+function extractBotNameFromLink(link) {
+  if (!link) return null;
+  try {
+    // Expect formats like https://t.me/BotName?start=.... or https://t.me/BotName
+    const url = new URL(link);
+    if (!url.hostname.includes('t.me')) return null;
+    const path = url.pathname.replace(/^\//, '');
+    return path.split('/')[0] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getRandomCandidateForUser(telegramId, excludeIds = []) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId], (err, currentUser) => {
+      if (err) return reject(err);
+
+      const currentBot = extractBotNameFromLink(currentUser && currentUser.main_link);
+
+      db.all(
+        'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
+        [telegramId],
+        (err2, rows) => {
+          if (err2) return reject(err2);
+          if (!rows || rows.length === 0) {
+            return resolve(null);
+          }
+
+          const filtered = rows.filter((row) => {
+            if (excludeIds.includes(row.telegram_id)) return false;
+            const botName = extractBotNameFromLink(row.main_link);
+            if (currentBot && botName && currentBot === botName) return false;
+            return true;
+          });
+
+          if (!filtered.length) {
+            return resolve(null);
+          }
+
+          const randomIndex = Math.floor(Math.random() * filtered.length);
+          resolve(filtered[randomIndex]);
+        }
+      );
+    });
+  });
+}
+
+async function showCandidate(ctx, currentUser, candidate) {
+  if (!candidate) {
+    await ctx.reply(
+      'Hozircha siz uchun mos link topilmadi. Iltimos, birozdan so‘ng qayta urinib ko‘ring.',
+      mainMenuKeyboard()
+    );
+    return;
+  }
+
+  const candidateName = candidate.name || '-';
+  const candidateUsername = candidate.username ? '@' + candidate.username : '-';
+  const candidateProfile = candidate.profile_link || '-';
+  const candidateLink = candidate.main_link || '-';
+  const candidateDescription = candidate.description || '-';
+
+  const text =
+    `🔗 Almashish uchun link:
+Egasining ismi: ${candidateName}
+Username: ${candidateUsername}
+Profil: ${candidateProfile}
+
+Link: ${candidateLink}
+
+Tavsif: ${candidateDescription}`;
+
+  currentCandidates.set(currentUser.telegram_id, candidate.telegram_id);
+  // Seen kandidatlar ro'yxatiga qo'shamiz
+  const seen = seenCandidates.get(currentUser.telegram_id) || new Set();
+  seen.add(candidate.telegram_id);
+  seenCandidates.set(currentUser.telegram_id, seen);
+
+  await ctx.reply(
+    text,
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ Bor', 'match_yes'),
+        Markup.button.callback('⏭ Yo‘q, keyingisi', 'match_no')
+      ],
+      [Markup.button.callback('🔙 Orqaga qaytish', 'match_back')]
+    ])
+  );
+}
+
+function updateUserLinkAndDescription(telegramId, link, description) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE users SET main_link = ?, description = ? WHERE telegram_id = ?`,
+      [link, description, telegramId],
+      function (err) {
+        if (err) return reject(err);
+        resolve();
+      }
+    );
+  });
+}
+
+bot.start(async (ctx) => {
+  const telegramId = ctx.from.id;
+
+  const ok = await requireSubscription(ctx);
+  if (!ok) return;
+
+  const existing = await findUserByTelegramId(telegramId);
+
+  if (!existing) {
+    await ctx.reply(
+      'Start almashish botiga xush kelibsiz!\n\nRo‘yxatdan o‘tish uchun telefon raqamingizni yuboring.',
+      startRegistrationKeyboard()
+    );
+    setState(telegramId, 'WAIT_PHONE');
+  } else if (!existing.main_link) {
+    await ctx.reply(
+      'Siz ro‘yxatdan o‘tgansiz, lekin hali almashish linkini kiritmagansiz.\nIltimos, bot linkingizni yuboring (masalan, https://t.me/yourbot?start=...).',
+      Markup.removeKeyboard()
+    );
+    setState(telegramId, 'WAIT_LINK');
+  } else {
+    await ctx.reply('Asosiy menyu', mainMenuKeyboard());
+    clearState(telegramId);
+  }
+});
+
+bot.action('check_sub', async (ctx) => {
+  const ok = await requireSubscription(ctx);
+  if (ok) {
+    await ctx.answerCbQuery('Obuna tasdiqlandi.');
+    await ctx.reply('Rahmat! Endi botdan to‘liq foydalanishingiz mumkin.', mainMenuKeyboard());
+  } else {
+    await ctx.answerCbQuery('Hali obuna bo‘lmadingiz.');
+  }
+});
+
+bot.action('change_link', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  await ctx.answerCbQuery();
+  await ctx.reply('Yangi bot/link manzilingizni yuboring (https:// bilan boshlansin).', Markup.removeKeyboard());
+  setState(telegramId, 'WAIT_NEW_LINK');
+});
+
+bot.on('contact', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const state = getState(telegramId);
+
+  const ok = await requireSubscription(ctx);
+  if (!ok) return;
+
+  if (state.state !== 'WAIT_PHONE') {
+    return;
+  }
+
+  const contact = ctx.message.contact;
+  if (!contact || contact.user_id !== telegramId) {
+    await ctx.reply('Iltimos, o‘z telefon raqamingizni yuboring.');
+    return;
+  }
+
+  const phone = contact.phone_number;
+  const name = `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim();
+  const username = ctx.from.username || null;
+  const profile_link = username ? `https://t.me/${username}` : null;
+
+  let user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    user = await createUser({
+      telegram_id: telegramId,
+      phone,
+      name,
+      username,
+      profile_link
+    });
+  }
+
+  await ctx.reply(
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi esa start almashish uchun ishlatiladigan bot linkingizni yuboring.\nMasalan: https://t.me/yourbot?start=... ',
+    Markup.removeKeyboard()
+  );
+
+  setState(telegramId, 'WAIT_LINK');
+});
+
+bot.on('text', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const text = ctx.message.text;
+  const state = getState(telegramId);
+
+  const ok = await requireSubscription(ctx);
+  if (!ok) return;
+
+  // Yordam chat holati: foydalanuvchilar o'zaro yozishishi uchun
+  if (state.state === 'HELP_CHAT') {
+    const exchangeId = state.data.exchangeId;
+    const ex = await getExchangeById(exchangeId);
+    if (!ex) {
+      await ctx.reply('Almashish yakunlangan yoki topilmadi. Asosiy menyuga qayting.', mainMenuKeyboard());
+      clearState(telegramId);
+      return;
+    }
+
+    const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+
+    // Agar suhbatni yakunlash tugmasi bosilsa
+    if (text === '🔚 Suhbatni yakunlash') {
+      clearState(telegramId);
+      clearState(otherTelegramId);
+
+      // Agar almashish hali screenshot bosqichida bo'lsa, maxsus klaviaturaga qaytamiz,
+      // aks holda asosiy menyuga
+      const stillEx = await getExchangeById(exchangeId);
+      const keyboard = stillEx && stillEx.status === 'waiting_screenshots' ? screenshotPhaseKeyboard() : mainMenuKeyboard();
+
+      await ctx.reply('💬 Suhbat yakunlandi.', keyboard);
+
+      try {
+        await bot.telegram.sendMessage(
+          otherTelegramId,
+          '💬 Suhbatdoshingiz suhbatni yakunladi.',
+          keyboard
+        );
+      } catch (e) {
+        // ignore
+      }
+
+      return;
+    }
+
+    // Agar suhbat davomida screenshot yuborish tugmasi bosilsa, avval suhbatni yakunlashni so'raymiz
+    if (text === '📸 Screenshot yubormoqchiman') {
+      await ctx.reply('Avval suhbatni yakunlang ("🔚 Suhbatni yakunlash"), so‘ng screenshot yuborishingiz mumkin.', helpChatKeyboard());
+      return;
+    }
+
+    // Oddiy xabarni sherikka uzatish
+    try {
+      await bot.telegram.sendMessage(
+        otherTelegramId,
+        `Suhbatdoshingizdan xabar:\n\n${text}`
+      );
+    } catch (e) {
+      // ignore
+    }
+
+    return;
+  }
+
+  // Global komandalar
+  if (text === '🔁 Almashishni topish') {
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+      return;
+    }
+
+    if (!user.main_link) {
+      await ctx.reply(
+        'Avval almashish uchun bot/link manzilingizni kiriting. /start buyrug‘ini yuboring.',
+        Markup.removeKeyboard()
+      );
+      setState(telegramId, 'WAIT_LINK');
+      return;
+    }
+
+    // Yangi sessiya: ko'rilgan kandidatlar ro'yxatini tozalaymiz
+    seenCandidates.set(telegramId, new Set());
+    previousCandidates.delete(telegramId);
+
+    const exclude = [];
+    const candidate = await getRandomCandidateForUser(telegramId, exclude);
+    await showCandidate(ctx, user, candidate);
+    return;
+  }
+
+  if (text === '👥 Do‘st taklif qilish') {
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+      return;
+    }
+
+    const botUsername = ctx.botInfo && ctx.botInfo.username ? ctx.botInfo.username : null;
+    if (!botUsername) {
+      await ctx.reply('Bot username topilmadi. Iltimos, keyinroq qayta urinib ko‘ring.', mainMenuKeyboard());
+      return;
+    }
+
+    const referralLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
+
+    let msg = '👥 Do‘st taklif qilish\n\n';
+    msg += 'Quyidagi referal linkingizni do‘stlaringizga yuboring. Ular shu link orqali botga kirib ro‘yxatdan o‘tsa, sizning takliflaringiz soni oshadi.\n\n';
+    msg += `Sizning linkingiz: ${referralLink}`;
+
+    await ctx.reply(msg, mainMenuKeyboard());
+    return;
+  }
+
+  if (text === '📚 Do‘stlar') {
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+      return;
+    }
+
+    const friends = await getFriendsForUser(telegramId);
+
+    if (!friends.length) {
+      await ctx.reply('Hozircha do‘stlaringiz yo‘q. Almashishlarni yakunlaganingizdan so‘ng “Do‘stlar qatoriga qo‘shish” tugmasidan foydalanishingiz mumkin.', mainMenuKeyboard());
+      return;
+    }
+
+    let msg = '📚 Sizning do‘stlaringiz:\n\n';
+    const buttons = [];
+
+    friends.forEach((f, idx) => {
+      const name = f.name || '-';
+      const username = f.username ? '@' + f.username : '-';
+      const profile = f.profile_link || '-';
+      msg += `${idx + 1}. ${name} (${username})\nProfil: ${profile}\n\n`;
+
+      buttons.push([
+        Markup.button.callback(`${name || username} bilan almashish`, `friend_ex_${f.telegram_id}`),
+        Markup.button.callback('🗑 O‘chirish', `friend_del_${f.telegram_id}`)
+      ]);
+    });
+
+    await ctx.reply(msg, {
+      ...mainMenuKeyboard(),
+      ...Markup.inlineKeyboard(buttons)
+    });
+    return;
+  }
+
+  if (text === '👤 Profil') {
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+      return;
+    }
+
+    let msg = '👤 Profil ma‘lumotlari:\n';
+    msg += `Ism: ${user.name || '-'}\n`;
+    msg += `Username: ${user.username ? '@' + user.username : '-'}\n`;
+    msg += `Telefon: ${user.phone || '-'}\n`;
+    msg += `Link: ${user.main_link || '-'}\n`;
+    msg += `Almashgan odamlar soni: ${user.total_exchanges || 0}\n`;
+    msg += `Taklif qilgan do‘stlar soni: ${user.invited_friends_count || 0}\n`;
+    msg += `Slotlar: ${user.used_slots || 0}/${user.slots || 1}`;
+
+    const kb = Markup.inlineKeyboard([
+      [Markup.button.callback('🔁 Linkni almashtirish', 'change_link')]
+    ]);
+
+    await ctx.reply(msg, { ...mainMenuKeyboard(), ...kb });
+    return;
+  }
+
+  if (text === '✉️ Savol va takliflar') {
+    await ctx.reply('Savol va takliflaringizni shu yerga yozib qoldiring. (Admin uchun aloqa: @your_username)');
+    return;
+  }
+
+  // Screenshot yuborish niyatini bildiruvchi tugma
+  if (text === '📸 Screenshot yubormoqchiman') {
+    const exchangeId = activeExchanges.get(telegramId);
+    if (!exchangeId) {
+      await ctx.reply('Hozir faol almashish yo‘q yoki screenshot yuborish bosqichida emassiz.', mainMenuKeyboard());
+      return;
+    }
+
+    const ex = await getExchangeById(exchangeId);
+    if (!ex || ex.status !== 'waiting_screenshots') {
+      await ctx.reply('Hozircha screenshot yuborish bosqichida emassiz.', mainMenuKeyboard());
+      return;
+    }
+
+    await ctx.reply('Endi botdagi topshiriqlarni bajaring va yakunlangach, screenshotni rasm (photo) sifatida yuboring.', screenshotPhaseKeyboard());
+    // State bo'yicha WAIT_SCREENSHOT allaqachon o'rnatilgan, photo handler shuni tekshiradi.
+    return;
+  }
+
+  // Almashish jarayoniga oid maxsus tugmalar
+  if (text === '✅ Qabul qilindi') {
+    const exchangeId = activeExchanges.get(telegramId);
+    if (!exchangeId) {
+      await ctx.reply('Hozir faol almashish yo‘q.', mainMenuKeyboard());
+      return;
+    }
+
+    const ex = await getExchangeById(exchangeId);
+    if (!ex) {
+      await ctx.reply('Almashish topilmadi.', mainMenuKeyboard());
+      activeExchanges.delete(telegramId);
+      return;
+    }
+
+    if (telegramId !== ex.user1_id && telegramId !== ex.user2_id) {
+      await ctx.reply('Bu almashish sizga tegishli emas.', mainMenuKeyboard());
+      return;
+    }
+
+    // Qaysi tomon sherikning screenshotini tasdiqlayotgani
+    const side = telegramId === ex.user1_id ? '2' : '1';
+    const field = side === '1' ? 'user2_approved' : 'user1_approved';
+    await updateExchange(exchangeId, { [field]: 1 });
+    await ctx.reply('Screenshot qabul qilindi deb belgilandi.', screenshotPhaseKeyboard());
+
+    const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+    try {
+      await bot.telegram.sendMessage(otherTelegramId, 'Siz yuborgan start qabul qilindi ✅');
+    } catch (e) {
+      // ignore
+    }
+
+    const updated = await getExchangeById(exchangeId);
+    if (updated.user1_approved && updated.user2_approved) {
+      await updateExchange(exchangeId, { status: 'completed' });
+
+      // total_exchanges ++ for both users
+      db.run('UPDATE users SET total_exchanges = total_exchanges + 1 WHERE telegram_id IN (?, ?)', [
+        updated.user1_id,
+        updated.user2_id
+      ]);
+
+      const kb = Markup.inlineKeyboard([
+        [Markup.button.callback('🤝 Do‘stlar qatoriga qo‘shish', `add_friend_${exchangeId}`)]
+      ]);
+
+      try {
+        await bot.telegram.sendMessage(
+          updated.user1_id,
+          'Almashish muvaffaqiyatli yakunlandi! Endi xohlasangiz, bir-biringizni do‘stlar qatoriga qo‘shishingiz mumkin.',
+          kb
+        );
+        await bot.telegram.sendMessage(
+          updated.user2_id,
+          'Almashish muvaffaqiyatli yakunlandi! Endi xohlasangiz, bir-biringizni do‘stlar qatoriga qo‘shishingiz mumkin.',
+          kb
+        );
+
+        await bot.telegram.sendMessage(updated.user1_id, 'Asosiy menyu:', mainMenuKeyboard());
+        await bot.telegram.sendMessage(updated.user2_id, 'Asosiy menyu:', mainMenuKeyboard());
+      } catch (e) {
+        // ignore
+      }
+
+      activeExchanges.delete(updated.user1_id);
+      activeExchanges.delete(updated.user2_id);
+    }
+
+    return;
+  }
+
+  if (text === '🚪 Chiqib ketish') {
+    const exchangeId = activeExchanges.get(telegramId);
+    if (!exchangeId) {
+      await ctx.reply('Hozir faol almashish yo‘q.', mainMenuKeyboard());
+      return;
+    }
+
+    const ex = await getExchangeById(exchangeId);
+    if (!ex) {
+      await ctx.reply('Almashish topilmadi.', mainMenuKeyboard());
+      activeExchanges.delete(telegramId);
+      return;
+    }
+
+    await updateExchange(exchangeId, { status: 'canceled' });
+
+    const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+
+    await ctx.reply('Siz almashish jarayonidan chiqib ketdingiz.', mainMenuKeyboard());
+    clearState(telegramId);
+    activeExchanges.delete(telegramId);
+
+    try {
+      await bot.telegram.sendMessage(
+        otherTelegramId,
+        'Siz bilan almashayotgan foydalanuvchi jarayondan chiqib ketdi. Almashish bekor qilindi.',
+        mainMenuKeyboard()
+      );
+      clearState(otherTelegramId);
+      activeExchanges.delete(otherTelegramId);
+    } catch (e) {
+      // ignore
+    }
+
+    return;
+  }
+
+  if (text === '⏳ Kelmadi hali') {
+    const exchangeId = activeExchanges.get(telegramId);
+    if (!exchangeId) {
+      await ctx.reply('Hozir faol almashish yo‘q.', mainMenuKeyboard());
+      return;
+    }
+
+    const ex = await getExchangeById(exchangeId);
+    if (!ex) {
+      await ctx.reply('Almashish topilmadi.', mainMenuKeyboard());
+      activeExchanges.delete(telegramId);
+      return;
+    }
+
+    const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+
+    await ctx.reply('Eslatma yuborildi. Iltimos, biroz kuting.', screenshotPhaseKeyboard());
+
+    const warningText =
+      'Sizga start bosish yoki tasdiqlash bo‘yicha eslatma:\n\n' +
+      'Iltimos, imkon qadar tezroq startni bosib, barcha shartlarni bajarib skrinshot yuboring. Agar 48 soat ichida jarayon yakunlanmasa, vaqtincha bloklanishingiz mumkin.';
+
+    try {
+      await bot.telegram.sendMessage(otherTelegramId, warningText, screenshotPhaseKeyboard());
+    } catch (e) {
+      // ignore
+    }
+
+    return;
+  }
+
+  // State-based logika
+  if (state.state === 'WAIT_ACCOUNTS') {
+    const exchangeId = state.data.exchangeId;
+    const side = state.data.side; // 'user1' yoki 'user2'
+    const count = parseInt(text.trim(), 10);
+
+    if (Number.isNaN(count) || count <= 0) {
+      await ctx.reply('Iltimos, faqat musbat butun son yuboring (masalan, 2, 3, 5).');
+      return;
+    }
+
+    const field = side === 'user1' ? 'accounts_user1' : 'accounts_user2';
+    await updateExchange(exchangeId, { [field]: count });
+
+    const ex = await getExchangeById(exchangeId);
+
+    if (ex.accounts_user1 && ex.accounts_user2) {
+      const min = Math.min(ex.accounts_user1, ex.accounts_user2);
+
+      await updateExchange(exchangeId, { status: 'waiting_screenshots' });
+
+      const msg =
+        `Rahmat! Siz kiritgan son qabul qilindi.\nBu almashish uchun eng kichik son: ${min} ta akkaunt.\n\nEndi botni aytilganidek qilib bo‘lgach, iltimos, screenshot yuboring.`;
+
+      const otherTelegramId = side === 'user1' ? ex.user2_id : ex.user1_id;
+
+      await ctx.reply(msg, screenshotPhaseKeyboard());
+      clearState(telegramId);
+
+      try {
+        await bot.telegram.sendMessage(otherTelegramId, msg, screenshotPhaseKeyboard());
+        setState(otherTelegramId, 'WAIT_SCREENSHOT', { exchangeId });
+      } catch (e) {
+        // ignore
+      }
+
+      setState(telegramId, 'WAIT_SCREENSHOT', { exchangeId });
+      activeExchanges.set(ex.user1_id, exchangeId);
+      activeExchanges.set(ex.user2_id, exchangeId);
+    } else {
+      await ctx.reply(
+        'Rahmat! Siz akkauntlaringiz sonini kiritdingiz. Endi ikkinchi tomondan ham son kiritilishi kutilmoqda.',
+        mainMenuKeyboard()
+      );
+      clearState(telegramId);
+    }
+
+    return;
+  }
+
+  if (state.state === 'WAIT_LINK') {
+    const link = text.trim();
+
+    if (!link.startsWith('http')) {
+      await ctx.reply('Iltimos, to‘g‘ri bot/link manzilini yuboring (https:// bilan).');
+      return;
+    }
+
+    await ctx.reply(
+      'Bu bot sizga nima uchun kerak va u nima qiladi? Qisqacha tushuntirib yozing.',
+      Markup.removeKeyboard()
+    );
+
+    setState(telegramId, 'WAIT_DESCRIPTION', { link });
+    return;
+  }
+
+  if (state.state === 'WAIT_DESCRIPTION') {
+    const { link } = state.data;
+    const description = text.trim();
+
+    await updateUserLinkAndDescription(telegramId, link, description);
+
+    await ctx.reply(
+      'Linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi start almashish va boshqa funksiyalardan foydalanishingiz mumkin.',
+      mainMenuKeyboard()
+    );
+
+    clearState(telegramId);
+    return;
+  }
+
+  if (state.state === 'WAIT_NEW_LINK') {
+    const link = text.trim();
+
+    if (!link.startsWith('http')) {
+      await ctx.reply('Iltimos, to‘g‘ri bot/link manzilini yuboring (https:// bilan).');
+      return;
+    }
+
+    await ctx.reply(
+      'Yangi linkingiz uchun ham qisqacha tushuntiring: bu bot sizga nima uchun kerak va u nima qiladi?',
+      Markup.removeKeyboard()
+    );
+
+    setState(telegramId, 'WAIT_NEW_DESCRIPTION', { link });
+    return;
+  }
+
+  if (state.state === 'WAIT_NEW_DESCRIPTION') {
+    const { link } = state.data;
+    const description = text.trim();
+
+    await updateUserLinkAndDescription(telegramId, link, description);
+
+    await ctx.reply(
+      'Yangi linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi start almashish va boshqa funksiyalardan yangilangan link bilan foydalanishingiz mumkin.',
+      mainMenuKeyboard()
+    );
+
+    clearState(telegramId);
+    return;
+  }
+
+  if (state.state === 'WAIT_SCREENSHOT') {
+    await ctx.reply('Iltimos, screenshotni rasm (photo) sifatida yuboring.');
+    return;
+  }
+
+  // Agar hech bir holatga tushmasa
+  await ctx.reply('Asosiy menyudan birini tanlang yoki /start buyrug‘ini yuboring.', mainMenuKeyboard());
+})
+
+bot.on('photo', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const state = getState(telegramId);
+
+  if (state.state !== 'WAIT_SCREENSHOT') {
+    return;
+  }
+
+  const exchangeId = state.data.exchangeId;
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.reply('Bu almashish topilmadi. Iltimos, qaytadan urinib ko‘ring.');
+    clearState(telegramId);
+    return;
+  }
+
+  const photos = ctx.message.photo;
+  if (!photos || !photos.length) {
+    await ctx.reply('Iltimos, screenshotni rasm sifatida yuboring.');
+    return;
+  }
+
+  const fileId = photos[photos.length - 1].file_id;
+
+  await addScreenshot(exchangeId, telegramId, fileId);
+
+  const isUser1 = telegramId === ex.user1_id;
+  const updateField = isUser1 ? { user1_screenshot_received: 1 } : { user2_screenshot_received: 1 };
+  await updateExchange(exchangeId, updateField);
+
+  const otherTelegramId = isUser1 ? ex.user2_id : ex.user1_id;
+
+  await ctx.reply('Screenshot qabul qilindi va ikkinchi tomonga yuborildi.', screenshotPhaseKeyboard());
+  clearState(telegramId);
+
+  try {
+    await bot.telegram.sendPhoto(
+      otherTelegramId,
+      fileId,
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback('✅ Qabul qilindi', `scr_ok_${exchangeId}_${isUser1 ? '1' : '2'}`),
+          Markup.button.callback('⏳ Hali kelmadi', `scr_wait_${exchangeId}_${isUser1 ? '1' : '2'}`)
+        ]
+      ])
+    );
+  } catch (e) {
+    // ignore
+  }
+});
+
+bot.action('match_no', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user || !user.main_link) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const currentCandidateId = currentCandidates.get(telegramId);
+  if (currentCandidateId) {
+    const seen = seenCandidates.get(telegramId) || new Set();
+    seen.add(currentCandidateId);
+    seenCandidates.set(telegramId, seen);
+    previousCandidates.set(telegramId, currentCandidateId);
+  }
+
+  const seen = seenCandidates.get(telegramId) || new Set();
+  const exclude = Array.from(seen);
+  const candidate = await getRandomCandidateForUser(telegramId, exclude);
+  await ctx.answerCbQuery();
+  if (!candidate) {
+    await ctx.reply(
+      'Hozircha siz uchun mos link topilmadi. Iltimos, birozdan so‘ng qayta urinib ko‘ring.',
+      mainMenuKeyboard()
+    );
+    return;
+  }
+
+  await showCandidate(ctx, user, candidate);
+});
+
+bot.action('match_back', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user || !user.main_link) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const prevId = previousCandidates.get(telegramId);
+  if (!prevId) {
+    await ctx.answerCbQuery('Orqaga qaytish uchun oldingi link topilmadi.');
+    return;
+  }
+
+  const candidate = await findUserByTelegramId(prevId);
+  if (!candidate || !candidate.main_link) {
+    await ctx.answerCbQuery('Oldingi link endi mavjud emas.');
+    return;
+  }
+
+  await ctx.answerCbQuery();
+  await showCandidate(ctx, user, candidate);
+});
+
+bot.action('match_yes', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const user = await findUserByTelegramId(telegramId);
+  if (!user || !user.main_link) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const candidateTelegramId = currentCandidates.get(telegramId);
+  if (!candidateTelegramId) {
+    await ctx.answerCbQuery('Hozircha tanlangan link topilmadi, qaytadan urinib ko‘ring.');
+    return;
+  }
+  const candidate = await findUserByTelegramId(candidateTelegramId);
+  if (!candidate || !candidate.main_link) {
+    await ctx.answerCbQuery('Bu foydalanuvchi hozircha almashish uchun mos emas.');
+    return;
+  }
+
+  const exchangeId = await createExchange(telegramId, candidateTelegramId);
+  activeExchanges.set(telegramId, exchangeId);
+  activeExchanges.set(candidateTelegramId, exchangeId);
+
+  await ctx.answerCbQuery('Taklif yuborildi.');
+  await ctx.reply(
+    'Siz bu foydalanuvchi bilan almashish uchun so‘rov yubordingiz. Ikkinchi tomondan javob kutilyapti.',
+    mainMenuKeyboard()
+  );
+
+  const uName = user.name || '-';
+  const uUsername = user.username ? '@' + user.username : '-';
+  const uProfile = user.profile_link || (user.username ? `https://t.me/${user.username}` : '-');
+  const uLink = user.main_link || '-';
+
+  const candidateText =
+    `Kimdir siz bilan start almashmoqchi:
+
+Ism: ${uName}
+Username: ${uUsername}
+Profil: ${uProfile}
+
+Bot/link manzili: ${uLink}
+
+Rozimisiz?`;
+
+  await bot.telegram.sendMessage(
+    candidateTelegramId,
+    candidateText,
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ Ha', `ex_accept_${exchangeId}`),
+        Markup.button.callback('❌ Yo‘q', `ex_reject_${exchangeId}`)
+      ]
+    ])
+  );
+});
+
+bot.action(/ex_accept_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Bu almashish topilmadi.');
+    return;
+  }
+
+  if (telegramId !== ex.user2_id) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  await updateExchange(exchangeId, { status: 'waiting_accounts' });
+  await ctx.answerCbQuery('Siz almashishga rozilik bildirdingiz.');
+
+  const msg = 'Nechta akkauntingiz bor? Iltimos, sonni (masalan, 2, 3, 5) yozib yuboring.';
+
+  activeExchanges.set(ex.user2_id, exchangeId);
+  setState(ex.user2_id, 'WAIT_ACCOUNTS', { exchangeId, side: 'user2' });
+  await ctx.reply(msg, exchangeWaitingKeyboard());
+
+  activeExchanges.set(ex.user1_id, exchangeId);
+  try {
+    await bot.telegram.sendMessage(ex.user1_id, msg, exchangeWaitingKeyboard());
+    setState(ex.user1_id, 'WAIT_ACCOUNTS', { exchangeId, side: 'user1' });
+  } catch (e) {
+    // ignore
+  }
+});
+
+bot.action(/scr_ok_(\d+)_(1|2)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+  const side = match[2];
+
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Almashish topilmadi.');
+    return;
+  }
+
+  if (telegramId !== ex.user1_id && telegramId !== ex.user2_id) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const field = side === '1' ? 'user2_approved' : 'user1_approved';
+  await updateExchange(exchangeId, { [field]: 1 });
+  await ctx.answerCbQuery('Screenshot qabul qilindi deb belgilandi.');
+
+  const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+  try {
+    await bot.telegram.sendMessage(otherTelegramId, 'Siz yuborgan start qabul qilindi ✅');
+  } catch (e) {
+    // ignore
+  }
+
+  const updated = await getExchangeById(exchangeId);
+  if (updated.user1_approved && updated.user2_approved) {
+    await updateExchange(exchangeId, { status: 'completed' });
+
+    // total_exchanges ++ for both users
+    db.run('UPDATE users SET total_exchanges = total_exchanges + 1 WHERE telegram_id IN (?, ?)', [
+      updated.user1_id,
+      updated.user2_id
+    ]);
+
+    const kb = Markup.inlineKeyboard([
+      [Markup.button.callback('🤝 Do‘stlar qatoriga qo‘shish', `add_friend_${exchangeId}`)]
+    ]);
+
+    try {
+      await bot.telegram.sendMessage(
+        updated.user1_id,
+        'Almashish muvaffaqiyatli yakunlandi! Endi xohlasangiz, bir-biringizni do‘stlar qatoriga qo‘shishingiz mumkin.',
+        kb
+      );
+      await bot.telegram.sendMessage(
+        updated.user2_id,
+        'Almashish muvaffaqiyatli yakunlandi! Endi xohlasangiz, bir-biringizni do‘stlar qatoriga qo‘shishingiz mumkin.',
+        kb
+      );
+
+      // Asosiy menyuni alohida xabar sifatida ko'rsatamiz
+      await bot.telegram.sendMessage(updated.user1_id, 'Asosiy menyu:', mainMenuKeyboard());
+      await bot.telegram.sendMessage(updated.user2_id, 'Asosiy menyu:', mainMenuKeyboard());
+    } catch (e) {
+      // ignore
+    }
+
+    // Bu almashishni aktiv ro'yxatdan olib tashlaymiz
+    activeExchanges.delete(updated.user1_id);
+    activeExchanges.delete(updated.user2_id);
+  }
+});
+
+bot.action(/scr_wait_(\d+)_(1|2)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Almashish topilmadi.');
+    return;
+  }
+
+  await ctx.answerCbQuery('Yaxshi, hali kutyapmiz.');
+
+  const otherTelegramId = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+  try {
+    await bot.telegram.sendMessage(
+      otherTelegramId,
+      'Siz yuborgan screenshot hozircha qabul qilinmadi. Iltimos, yaxshiroq tekshiring va kerak bo‘lsa qayta yuboring.',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('❓ Tushunmadim', `help_chat_${exchangeId}`)]
+      ])
+    );
+  } catch (e) {
+    // ignore
+  }
+});
+
+bot.action(/help_chat_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Almashish topilmadi.');
+    return;
+  }
+
+  if (telegramId !== ex.user1_id && telegramId !== ex.user2_id) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  await ctx.answerCbQuery('Yordam chati ochildi.');
+
+  // Ikkala tomonni ham HELP_CHAT holatiga qo'yamiz
+  setState(ex.user1_id, 'HELP_CHAT', { exchangeId });
+  setState(ex.user2_id, 'HELP_CHAT', { exchangeId });
+
+  try {
+    await bot.telegram.sendMessage(
+      ex.user1_id,
+      '💬 Siz almashish bo‘yicha suhbat rejimidasiz. Savollaringizni bu yerda yozishingiz mumkin. Yozganlaringiz bevosita sherigingizga boradi.\n⚠️ Diqqat: "🔚 Suhbatni yakunlash" tugmasini bosmaguningizcha, yakuniy qabul qilish jarayoni tugallanmaydi.',
+      helpChatKeyboard()
+    );
+    await bot.telegram.sendMessage(
+      ex.user2_id,
+      '💬 Siz almashish bo‘yicha suhbat rejimidasiz. Savollaringizni bu yerda yozishingiz mumkin. Yozganlaringiz bevosita sherigingizga boradi.\n⚠️ Diqqat: "🔚 Suhbatni yakunlash" tugmasini bosmaguningizcha, yakuniy qabul qilish jarayoni tugallanmaydi.',
+      helpChatKeyboard()
+    );
+  } catch (e) {
+    // ignore
+  }
+});
+
+bot.action(/add_friend_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Almashish topilmadi.');
+    return;
+  }
+
+  if (telegramId !== ex.user1_id && telegramId !== ex.user2_id) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const me = telegramId;
+  const other = telegramId === ex.user1_id ? ex.user2_id : ex.user1_id;
+
+  db.get(
+    'SELECT id FROM friendships WHERE user_id = ? AND friend_id = ?',
+    [me, other],
+    (err, row) => {
+      if (err) {
+        console.error('Do‘stlikni tekshirishda xato:', err);
+        ctx.answerCbQuery('Xatolik yuz berdi, keyinroq urinib ko‘ring.');
+        return;
+      }
+
+      if (row) {
+        ctx.answerCbQuery('Siz allaqachon do‘stsizlar.');
+        return;
+      }
+
+      db.run(
+        'INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)',
+        [me, other, Date.now()],
+        (err2) => {
+          if (err2) {
+            console.error('Do‘stlikni qo‘shishda xato:', err2);
+            ctx.answerCbQuery('Xatolik yuz berdi, keyinroq urinib ko‘ring.');
+            return;
+          }
+
+          ctx.answerCbQuery('Bu foydalanuvchi do‘stlaringiz qatoriga qo‘shildi (siz tomonda).');
+        }
+      );
+    }
+  );
+});
+
+bot.action(/friend_del_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const friendTelegramId = parseInt(match[1], 10);
+
+  db.run(
+    'DELETE FROM friendships WHERE user_id = ? AND friend_id = ?',
+    [telegramId, friendTelegramId],
+    (err) => {
+      if (err) {
+        console.error('Do‘stni o‘chirishda xato:', err);
+        ctx.answerCbQuery('Xatolik yuz berdi, keyinroq urinib ko‘ring.');
+        return;
+      }
+
+      ctx.answerCbQuery('Do‘stlar ro‘yxatidan o‘chirildi.');
+    }
+  );
+});
+
+bot.action(/friend_ex_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const friendTelegramId = parseInt(match[1], 10);
+
+  if (telegramId === friendTelegramId) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const user = await findUserByTelegramId(telegramId);
+  const friend = await findUserByTelegramId(friendTelegramId);
+
+  if (!user || !friend || !user.main_link || !friend.main_link) {
+    await ctx.answerCbQuery('Bu do‘st bilan hozircha almashish mumkin emas.');
+    return;
+  }
+
+  const exchangeId = await createExchange(telegramId, friendTelegramId);
+  activeExchanges.set(telegramId, exchangeId);
+  activeExchanges.set(friendTelegramId, exchangeId);
+
+  await ctx.answerCbQuery('Do‘st bilan almashish boshlandi.');
+
+  const msg = 'Siz tanlagan do‘st bilan start almashish boshlandi. Ikkalangiz ham almashishga rozimisiz? Nechta akkauntingiz borligini keyingi bosqichda kiritasiz.';
+  await ctx.reply(msg, mainMenuKeyboard());
+
+  const friendText = `Sizning do‘stinggiz ${user.name || '@' + (user.username || telegramId)} siz bilan start almashmoqchi. Rozimisiz?`;
+
+  await bot.telegram.sendMessage(
+    friendTelegramId,
+    friendText,
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ Ha', `ex_accept_${exchangeId}`),
+        Markup.button.callback('❌ Yo‘q', `ex_reject_${exchangeId}`)
+      ]
+    ])
+  );
+});
+
+bot.action(/ex_reject_(\d+)/, async (ctx) => {
+  const telegramId = ctx.from.id;
+  const match = ctx.match;
+  const exchangeId = parseInt(match[1], 10);
+  const ex = await getExchangeById(exchangeId);
+  if (!ex) {
+    await ctx.answerCbQuery('Bu almashish topilmadi.');
+    return;
+  }
+
+  if (telegramId !== ex.user2_id) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  await updateExchange(exchangeId, { status: 'rejected' });
+  await ctx.answerCbQuery('Siz bu almashuvni rad etdingiz.');
+
+  try {
+    await bot.telegram.sendMessage(
+      ex.user1_id,
+      'Afsuski, siz taklif qilgan almashish so‘rovi ikkinchi foydalanuvchi tomonidan rad etildi.',
+      mainMenuKeyboard()
+    );
+  } catch (e) {
+    // ignore
+  }
+});
+
+bot.launch().then(() => {
+  console.log('Bot ishga tushdi');
+});
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
