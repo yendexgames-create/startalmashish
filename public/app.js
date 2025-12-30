@@ -35,6 +35,31 @@
     });
   }
 
+  // Bosh sahifadagi tugmalar
+  if (homeGoExchange) {
+    homeGoExchange.addEventListener('click', () => {
+      switchView('view-exchange');
+    });
+  }
+
+  if (homeGoFriends) {
+    homeGoFriends.addEventListener('click', () => {
+      switchView('view-friends');
+    });
+  }
+
+  if (homeGoProfile) {
+    homeGoProfile.addEventListener('click', () => {
+      switchView('view-profile');
+    });
+  }
+
+  if (homeGoHelp) {
+    homeGoHelp.addEventListener('click', () => {
+      switchView('view-help');
+    });
+  }
+
   navItems.forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-target');
@@ -85,9 +110,6 @@
         Array.isArray(slotsData.links) &&
         slotsData.links.some((l) => l.slot_index === 1 && l.link);
 
-      // Asosiy ko'rinish sifatida bosh sahifa (profil + slotlar + statistika) ochiladi
-      switchView('view-profile');
-
       if (!hasSlot1Link) {
         // 1-slot uchun link yo'q – navbarni yopib, foydalanuvchidan link kiritishni so'raymiz
         if (navbar) {
@@ -102,10 +124,11 @@
           });
         }
       } else {
-        // 1-slot allaqachon bor – navbar ochiq bo'ladi
+        // 1-slot allaqachon bor – navbar ochiq bo'ladi va asosiy bosh sahifa ko'rsatiladi
         if (navbar) {
           navbar.style.display = 'flex';
         }
+        switchView('view-home');
       }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
@@ -116,7 +139,7 @@
       if (navbar) {
         navbar.style.display = 'flex';
       }
-      switchView('view-profile');
+      switchView('view-home');
     }
   }
 
@@ -352,6 +375,10 @@
   // --- Tugmalar uchun oddiy handlerlar ---
   const btnStartExchange = document.getElementById('btn-start-exchange');
   const btnShareRef = document.getElementById('btn-share-ref');
+  const homeGoExchange = document.getElementById('home-go-exchange');
+  const homeGoFriends = document.getElementById('home-go-friends');
+  const homeGoProfile = document.getElementById('home-go-profile');
+  const homeGoHelp = document.getElementById('home-go-help');
 
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {

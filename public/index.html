@@ -21,12 +21,24 @@
       </header>
 
       <main class="app-main">
-        <section class="view view-active" id="view-exchange">
+        <section class="view view-active" id="view-home">
+          <div class="card hero-card">
+            <h2>🏠 Bosh sahifa</h2>
+            <p class="hero-text">Quyidagi bo'limlardan birini tanlab, botdan va Web ilovadan foydalanishni davom eting.</p>
+            <div class="home-actions">
+              <button id="home-go-exchange" class="primary-btn home-btn">🔁 Almashishni topish</button>
+              <button id="home-go-friends" class="secondary-btn home-btn">👥 Do'stlar</button>
+              <button id="home-go-profile" class="secondary-btn home-btn">👤 Profil va slotlar</button>
+              <button id="home-go-help" class="secondary-btn home-btn">❓ Foydalanishni o'rganish</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-exchange">
           <div class="card hero-card">
             <h2>🔁 Almashishni topish</h2>
             <p class="hero-text">
-              Bu bo'limda siz slotlaringizdan qaysi biri bilan almashishni boshlashni tanlaysiz. Asosiy
-              boshqaruvlar "Bosh sahifa" bo'limida joylashgan.
+              Bu bo'limda siz slotlaringizdan qaysi biri bilan almashishni boshlashni tanlaysiz.
             </p>
             <button id="btn-start-exchange" class="primary-btn">Almashishni boshlash</button>
           </div>
@@ -37,7 +49,7 @@
             <h2>👥 Do'stlar</h2>
             <button id="btn-share-ref" class="secondary-btn">Do'st taklif qilish</button>
             <p class="hint-text">
-              To'liq do'stlar ro'yxatini va statistikani "Bosh sahifa" bo'limidan ham ko'rishingiz mumkin.
+              Referal orqali do'stlar taklif qilib, qo'shimcha slotlar ochishingiz mumkin.
             </p>
           </div>
         </section>
@@ -62,11 +74,26 @@
             <h3>Do'stlar ro'yxati</h3>
             <div id="friends-content">Hozircha ma'lumot yo'q.</div>
           </div>
+
+          <section class="view" id="view-help">
+            <div class="card" id="help-card">
+              <h2>❓ Foydalanishni o'rganish</h2>
+              <p class="hero-text">
+                Bu bo'limda bot va Web ilova bilan qanday ishlash bo'yicha qisqa ko'rsatmalar ko'rsatiladi.
+              </p>
+              <ul class="help-list">
+                <li>1. Botni /start qiling va kerakli ma'lumotlarni kiriting.</li>
+                <li>2. 1-slot uchun asosiy bot/link va tavsifni to'ldiring.</li>
+                <li>3. "Almashishni topish" tugmasidan almashish jarayonini boshlang.</li>
+                <li>4. Do'stlar taklif qilib, qo'shimcha slotlarni oching.</li>
+              </ul>
+            </div>
+          </section>
         </section>
       </main>
 
       <nav class="bottom-nav">
-        <button class="nav-item nav-item-active" data-target="view-profile">
+        <button class="nav-item nav-item-active" data-target="view-home">
           <span class="nav-icon">🏠</span>
           <span class="nav-label">Bosh sahifa</span>
         </button>
@@ -81,6 +108,10 @@
         <button class="nav-item" data-target="view-profile">
           <span class="nav-icon">👤</span>
           <span class="nav-label">Profil</span>
+        </button>
+        <button class="nav-item" data-target="view-help">
+          <span class="nav-icon">❓</span>
+          <span class="nav-label">Foydalanish</span>
         </button>
       </nav>
     </div>
