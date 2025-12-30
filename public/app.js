@@ -81,6 +81,27 @@
         fetch(`/api/friends?telegram_id=${telegramId}`)
       ]);
 
+      if (meRes.status === 404) {
+        // Foydalanuvchi hali bot orqali ro'yxatdan o'tmagan
+        profileDiv.textContent =
+          "Avval botda ro'yxatdan o'ting. Telegram bot chatida /start buyrug'ini bosing, so'ng 1-slot uchun asosiy bot/link va tavsifni kiriting.";
+        quickStatsDiv.innerHTML = '';
+        friendsDiv.innerHTML =
+          "Ro'yxatdan o'tganingizdan so'ng bu yerda do'stlaringiz va referallar statistikasi ko'rinadi.";
+        if (navbar) {
+          navbar.style.display = 'none';
+        }
+        if (tg && tg.showPopup) {
+          tg.showPopup({
+            title: "Ro'yxatdan o'tish kerak",
+            message:
+              "Web ilovadan foydalanishdan oldin botda /start buyrug'ini bering va 1-slot uchun asosiy linkni kiriting. Shundan keyin bu yerda slotlar, almashish va statistika ochiladi.",
+            buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
+          });
+        }
+        return;
+      }
+
       if (!meRes.ok) throw new Error('me failed');
       const meData = await meRes.json();
 
@@ -137,7 +158,7 @@
           tg.showPopup({
             title: '1-slot uchun link kerak',
             message:
-              'Avval 1-slot uchun bot/link manzilini kiriting. Bu link almashish jarayonlarida ishlatiladi.',
+              'Avval 1-slot uchun asosiy bot/link manzilini va qisqacha tavsifni kiriting. Bu link almashish paytida boshqa foydalanuvchilarga sizning asosiy botingiz sifatida ko‘rsatiladi.',
             buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
           });
         }
