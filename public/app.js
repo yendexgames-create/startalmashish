@@ -85,8 +85,8 @@
         Array.isArray(slotsData.links) &&
         slotsData.links.some((l) => l.slot_index === 1 && l.link);
 
-      // Har doim birinchi bo'lib Slotlar bo'limini ochamiz
-      switchView('view-slots');
+      // Asosiy ko'rinish sifatida bosh sahifa (profil + slotlar + statistika) ochiladi
+      switchView('view-profile');
 
       if (!hasSlot1Link) {
         // 1-slot uchun link yo'q – navbarni yopib, foydalanuvchidan link kiritishni so'raymiz

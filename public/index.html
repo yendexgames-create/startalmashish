@@ -25,14 +25,10 @@
           <div class="card hero-card">
             <h2>🔁 Almashishni topish</h2>
             <p class="hero-text">
-              Bu bo'limda siz botdagi slotlaringizdan birini tanlab, almashish uchun eng mos hamkorni topasiz.
+              Bu bo'limda siz slotlaringizdan qaysi biri bilan almashishni boshlashni tanlaysiz. Asosiy
+              boshqaruvlar "Bosh sahifa" bo'limida joylashgan.
             </p>
             <button id="btn-start-exchange" class="primary-btn">Almashishni boshlash</button>
-          </div>
-
-          <div class="card" id="quick-stats-card">
-            <h3>Qisqa statistika</h3>
-            <div id="quick-stats-content">Yuklanmoqda...</div>
           </div>
         </section>
 
@@ -41,13 +37,8 @@
             <h2>👥 Do'stlar</h2>
             <button id="btn-share-ref" class="secondary-btn">Do'st taklif qilish</button>
             <p class="hint-text">
-              5 ta do'st taklif qilsangiz, sizga qo'shimcha slotlar ochiladi.
+              To'liq do'stlar ro'yxatini va statistikani "Bosh sahifa" bo'limidan ham ko'rishingiz mumkin.
             </p>
-          </div>
-
-          <div class="card" id="friends-card">
-            <h3>Do'stlar ro'yxati</h3>
-            <div id="friends-content">Hozircha ma'lumot yo'q.</div>
           </div>
         </section>
 
@@ -61,11 +52,25 @@
             <h3>Slotlar</h3>
             <div id="slots-content">Yuklanmoqda...</div>
           </div>
+
+          <div class="card" id="quick-stats-card">
+            <h3>Qisqa statistika</h3>
+            <div id="quick-stats-content">Yuklanmoqda...</div>
+          </div>
+
+          <div class="card" id="friends-card">
+            <h3>Do'stlar ro'yxati</h3>
+            <div id="friends-content">Hozircha ma'lumot yo'q.</div>
+          </div>
         </section>
       </main>
 
       <nav class="bottom-nav">
-        <button class="nav-item nav-item-active" data-target="view-exchange">
+        <button class="nav-item nav-item-active" data-target="view-profile">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Bosh sahifa</span>
+        </button>
+        <button class="nav-item" data-target="view-exchange">
           <span class="nav-icon">🔁</span>
           <span class="nav-label">Almashish</span>
         </button>
