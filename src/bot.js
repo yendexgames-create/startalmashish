@@ -461,11 +461,13 @@ bot.on('contact', async (ctx) => {
       });
     }
   }
-
   await ctx.reply(
-    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi shu chat ostidagi "Open" tugmasini bosib Web ilovani oching va 1-slot uchun linkingizni kiriting.',
-    mainMenuKeyboard()
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi start almashish uchun ishlatiladigan bot/link manzilini yuboring.\nMasalan: https://t.me/yourbot?start=...',
+    Markup.removeKeyboard()
   );
+
+  // Keyingi bosqichda linkni qabul qilish uchun holat
+  setState(telegramId, 'WAIT_LINK');
 
   // Agar referal orqali kelgan bo'lsa, taklif qilgan odamga xabar yuboramiz
   if (referrerId) {
@@ -953,10 +955,7 @@ bot.on('text', async (ctx) => {
       return;
     }
 
-    await ctx.reply(
-      'Bu bot sizga nima uchun kerak va u nima qiladi? Qisqacha tushuntirib yozing.',
-      Markup.removeKeyboard()
-    );
+    await ctx.reply('Bu botni start bosganda foydalanuvchi nima qilish kerak? Qisqacha tushuntirib yozing.', Markup.removeKeyboard());
 
     setState(telegramId, 'WAIT_DESCRIPTION', { link });
     return;
@@ -976,7 +975,7 @@ bot.on('text', async (ctx) => {
     }
 
     await ctx.reply(
-      'Linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi start almashish va boshqa funksiyalardan foydalanishingiz mumkin.',
+      'Linkingiz va tushuntirishingiz saqlandi. ✅\n\nEndi shu chat ostidagi "Open" tugmasini bosib Web ilovani oching va profil hamda slotlaringizni boshqarishingiz mumkin.',
       mainMenuKeyboard()
     );
 

@@ -86,9 +86,11 @@
         Array.isArray(slotsData.links) &&
         slotsData.links.some((l) => l.slot_index === 1 && l.link);
 
+      // Har doim birinchi bo'lib Slotlar bo'limini ochamiz
+      switchView('view-slots');
+
       if (!hasSlot1Link) {
-        // 1-slot uchun link yo'q – foydalanuvchini slotlar bo'limiga olib boramiz
-        switchView('view-slots');
+        // 1-slot uchun link yo'q – navbarni yopib, foydalanuvchidan link kiritishni so'raymiz
         if (navbar) {
           navbar.style.display = 'none';
         }
@@ -101,11 +103,10 @@
           });
         }
       } else {
-        // Asosiy maʼlumotlar tayyor – profil bo'limini ochamiz
+        // 1-slot allaqachon bor – navbar ochiq bo'ladi
         if (navbar) {
           navbar.style.display = 'flex';
         }
-        switchView('view-profile');
       }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
