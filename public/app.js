@@ -227,12 +227,17 @@
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
       if (tg) {
-        tg.showPopup({
-          title: 'Almashishni boshlash',
-          message:
-            'Almashishni bot ichida boshlaysiz. Bu WebApp faqat profil va slotlarni boshqarish uchun. Asosiy chatga qayting va "🔁 Almashishni topish" tugmasini bosing.',
-          buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
-        });
+        try {
+          tg.sendData(
+            JSON.stringify({
+              type: 'start_exchange'
+            })
+          );
+          tg.close();
+        } catch (e) {
+          console.error('sendData xato:', e);
+          tg.showAlert('Almashishni boshlashda xatolik. Iltimos, botdagi "🔁 Almashishni topish" tugmasidan foydalaning.');
+        }
       }
     });
   }

@@ -1115,6 +1115,63 @@ bot.on('text', async (ctx) => {
   await ctx.reply('Asosiy menyudan birini tanlang yoki /start buyrug‘ini yuboring.', mainMenuKeyboard());
 })
 
+// WebApp dan kelgan ma'lumotlar (tg.sendData)
+bot.on('web_app_data', async (ctx) => {
+  const telegramId = ctx.from.id;
+
+  const ok = await requireSubscription(ctx);
+  if (!ok) return;
+
+  let payload = null;
+  try {
+    payload = ctx.webAppData && ctx.webAppData.data ? JSON.parse(ctx.webAppData.data) : null;
+  } catch (e) {
+    payload = null;
+  }
+
+  if (!payload || payload.type !== 'start_exchange') {
+    return;
+  }
+
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+    return;
+  }
+
+  let links = [];
+  try {
+    links = await getUserLinks(telegramId);
+  } catch (e) {
+    console.error('user_links o‘qishda xato (web_app start):', e);
+  }
+
+  const availableSlots = [];
+  for (let i = 1; i <= Math.min(user.slots || 1, 3); i++) {
+    const slot = links.find((l) => l.slot_index === i && l.link);
+    if (slot) {
+      availableSlots.push({ index: i, link: slot.link });
+    }
+  }
+
+  if (!availableSlots.length) {
+    await ctx.reply(
+      'Hali hech bir slotingiz uchun link kiritilmagan. Avval Web ilovada yoki botdagi profil bo‘limida kamida 1-slot uchun link qo‘ying.',
+      mainMenuKeyboard()
+    );
+    return;
+  }
+
+  const buttons = availableSlots.map((s) => [
+    Markup.button.callback(`${s.index}-slot: ${s.link}`, `slot_search_${s.index}`)
+  ]);
+
+  await ctx.reply(
+    'Web ilovadan qaytdingiz. Qaysi slot uchun almashish topmoqchisiz? Slotni tanlang:',
+    Markup.inlineKeyboard(buttons)
+  );
+});
+
 // Referal xabari ichidagi "👤 Profilga o‘tish" tugmasi uchun callback
 bot.action('open_profile', async (ctx) => {
   const telegramId = ctx.from.id;
