@@ -28,7 +28,6 @@
   const tileStatsInfo = document.getElementById('tile-stats-info');
 
   // Splash va tutorial elementlari
-  const splash = document.getElementById('splash');
   const tutorialOverlay = document.getElementById('tutorial-overlay');
   const tutorialHighlight = document.getElementById('tutorial-highlight');
   const tutorialTooltip = document.getElementById('tutorial-tooltip');
@@ -155,8 +154,8 @@
         fetch(`/api/friends?telegram_id=${telegramId}`)
       ]);
 
+      // Ro'yxatdan o'tmagan foydalanuvchi
       if (meRes.status === 404) {
-        // Foydalanuvchi hali bot orqali ro'yxatdan o'tmagan
         profileDiv.textContent =
           "Avval botda ro'yxatdan o'ting. Telegram bot chatida /start buyrug'ini bosing, so'ng 1-slot uchun asosiy bot/link va tavsifni kiriting.";
         quickStatsDiv.innerHTML = '';
@@ -176,27 +175,31 @@
         return;
       }
 
-      if (!meRes.ok) throw new Error('me failed');
-      const meData = await meRes.json();
-
-      let slotsData = null;
-      if (slotsRes.ok) {
-        slotsData = await slotsRes.json();
+      if (!meRes.ok) {
+        throw new Error('me failed');
       }
 
+      const meData = await meRes.json();
+
+      const slotsData = slotsRes.ok ? await slotsRes.json() : null;
       const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
 
-      const links = (slotsData && Array.isArray(slotsData.links)) ? slotsData.links : [];
+      const links = slotsData && Array.isArray(slotsData.links) ? slotsData.links : [];
       const activeSlots = links.filter((l) => l.link).length;
       const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
 
+      // Asosiy bo'limlarni chizish
       renderProfile(meData.user, u, { activeSlots, totalSlots });
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
 
       // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
       if (homeUsername) {
-        homeUsername.textContent = meData.user.username ? '@' + meData.user.username : u.username ? '@' + u.username : 'Foydalanuvchi';
+        homeUsername.textContent = meData.user.username
+          ? '@' + meData.user.username
+          : u.username
+          ? '@' + u.username
+          : 'Foydalanuvchi';
       }
       if (homeSlotsShort) {
         homeSlotsShort.textContent = `Slotlar: ${activeSlots}/${totalSlots}`;
@@ -236,7 +239,6 @@
             buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
           });
         }
-        // Foydalanuvchi birinchi navbatda 1-slotni to'ldirishi uchun Profil/Slotlar bo'limiga yo'naltiramiz
         switchView('view-profile');
       } else {
         // 1-slot allaqachon bor – navbar ochiq bo'ladi va asosiy bosh sahifa ko'rsatiladi
@@ -245,33 +247,13 @@
         }
         switchView('view-home');
 
-        function showSplashIfNeeded() {
-          if (!splash) return;
-          const done = window.localStorage.getItem('splash_done');
-          if (done === '1') {
-            splash.classList.add('hidden');
-            return;
-          }
-          splash.classList.remove('hidden');
-          setTimeout(() => {
-            splash.style.opacity = '0';
-            setTimeout(() => {
-              splash.classList.add('hidden');
-              splash.style.opacity = '';
-            }, 500);
-          }, 2500);
-          window.localStorage.setItem('splash_done', '1');
-        }
-
         // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
         const tutorialDone = window.localStorage.getItem('tutorial_done');
         if (tutorialDone !== '1') {
-          // Bosh sahifa DOMi ko'rinishi uchun biroz kechiktiramiz
           setTimeout(() => {
             startTutorial();
           }, 400);
         }
-        showSplashIfNeeded();
       }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
@@ -549,7 +531,6 @@
   }
 
   // Boshlang'ich render
-  showSplashIfNeeded();
   initSnowIfSeason();
   loadFromBackend();
 })();
