@@ -109,19 +109,7 @@ function clearState(userId) {
 }
 
 function mainMenuKeyboard() {
-  return Markup.keyboard([
-    ['🔁 Almashishni topish'],
-    ['👥 Do‘st taklif qilish', '📚 Do‘stlar'],
-    ['👤 Profil', '✉️ Savol va takliflar'],
-    [
-      {
-        text: '🧩 Web ilova',
-        web_app: {
-          url: WEBAPP_URL
-        }
-      }
-    ]
-  ]).resize();
+  return Markup.removeKeyboard();
 }
 
 function exchangeWaitingKeyboard() {
@@ -370,7 +358,10 @@ bot.start(async (ctx) => {
     // referrerId bo'lsa, keyingi bosqichda saqlash uchun state'ga qo'yamiz
     setState(telegramId, 'WAIT_PHONE', { referrerId });
   } else {
-    await ctx.reply('Asosiy menyu', mainMenuKeyboard());
+    await ctx.reply(
+      'Siz ro‘yxatdan o‘tgansiz. Endi pastdagi "Open" tugmasi orqali Web ilovani ochib profil va slotlaringizni boshqarishingiz mumkin.',
+      mainMenuKeyboard()
+    );
     clearState(telegramId);
   }
 });
@@ -472,7 +463,7 @@ bot.on('contact', async (ctx) => {
   }
 
   await ctx.reply(
-    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi asosiy menyudan foydalanishingiz mumkin. Profil va slotlaringizni Web ilova orqali boshqarishingiz mumkin.',
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi shu chat ostidagi "Open" tugmasini bosib Web ilovani oching va 1-slot uchun linkingizni kiriting.',
     mainMenuKeyboard()
   );
 

@@ -12,6 +12,8 @@
   const friendsDiv = document.getElementById('friends-content');
   const quickStatsDiv = document.getElementById('quick-stats-content');
 
+  const navbar = document.querySelector('.bottom-nav');
+
   let currentTelegramId = null;
 
   // --- Navigatsiya (pastki navbar) ---
@@ -87,6 +89,9 @@
       if (!hasSlot1Link) {
         // 1-slot uchun link yo'q – foydalanuvchini slotlar bo'limiga olib boramiz
         switchView('view-slots');
+        if (navbar) {
+          navbar.style.display = 'none';
+        }
         if (tg) {
           tg.showPopup({
             title: '1-slot uchun link kerak',
@@ -97,6 +102,9 @@
         }
       } else {
         // Asosiy maʼlumotlar tayyor – profil bo'limini ochamiz
+        if (navbar) {
+          navbar.style.display = 'flex';
+        }
         switchView('view-profile');
       }
     } catch (e) {
@@ -105,6 +113,9 @@
       renderProfile(null, tg.initDataUnsafe.user);
       renderSlots();
       renderFriends([]);
+      if (navbar) {
+        navbar.style.display = 'flex';
+      }
       switchView('view-profile');
     }
   }
@@ -219,13 +230,18 @@
           if (tg) {
             tg.showPopup({
               title: 'Saqlangan',
-              message: '1-slot linkingiz yangilandi. Endi almashishlarda shu link ishlatiladi.',
+              message:
+                '1-slot linkingiz va tavsifingiz saqlandi. Endi asosiy menyudan almashish va boshqa bo‘limlardan foydalanishingiz mumkin.',
               buttons: [{ id: 'ok', type: 'close', text: 'OK' }]
             });
           }
 
-          // Qayta yuklab, yangilangan maʼlumotni ko'rsatamiz
-          loadFromBackend();
+          // Qayta yuklab, yangilangan maʼlumotni ko'rsatamiz va navbarni yoqamiz
+          await loadFromBackend();
+          if (navbar) {
+            navbar.style.display = 'flex';
+          }
+          switchView('view-exchange');
         } catch (e) {
           console.error('Slot saqlashda xato:', e);
           if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
