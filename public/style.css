@@ -167,6 +167,113 @@ body {
   margin-bottom: 10px;
 }
 
+/* Bosh sahifa mini profil */
+#home-mini-profile {
+  display: flex;
+  align-items: center;
+}
+
+.home-profile-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-profile-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-profile-username {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.home-profile-slots {
+  font-size: 0.82rem;
+  color: #7fa650;
+}
+
+.home-grid-card {
+  margin-top: 6px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 110px;
+  gap: 10px;
+}
+
+.home-tile {
+  border-radius: 18px;
+  border: 1px solid #333333;
+  background: #262626;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, background 0.12s ease-out;
+}
+
+.home-tile .tile-icon {
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+
+.home-tile .tile-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.home-tile .tile-sub {
+  font-size: 0.8rem;
+  color: #b0b0b0;
+}
+
+.home-tile:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7);
+}
+
+.home-tile:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.tile-exchange {
+  background: linear-gradient(135deg, #7fa650, #8bc34a);
+}
+
+.tile-exchange .tile-sub {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tile-friends .tile-icon,
+.tile-slots .tile-icon,
+.tile-referral .tile-icon,
+.tile-stats .tile-icon {
+  color: #7fa650;
+}
+
+.tile-help .tile-icon {
+  color: #b0b0b0;
+}
+
 /* Profil karta (Chess.com style) */
 #profile-card {
   display: flex;

@@ -14,11 +14,20 @@
 
   const navbar = document.querySelector('.bottom-nav');
 
-  let currentTelegramId = null;
-
-  // --- Navigatsiya (pastki navbar) ---
+  // Bosh sahifadagi tugmalar va nav elementlari
   const navItems = document.querySelectorAll('.nav-item');
   const views = document.querySelectorAll('.view');
+  const btnStartExchange = document.getElementById('btn-start-exchange');
+  const btnShareRef = document.getElementById('btn-share-ref');
+  const homeTiles = document.querySelectorAll('.home-tile');
+  const homeUsername = document.getElementById('home-username');
+  const homeSlotsShort = document.getElementById('home-slots-short');
+  const tileSlotsInfo = document.getElementById('tile-slots-info');
+  const tileFriendsInfo = document.getElementById('tile-friends-info');
+  const tileRefInfo = document.getElementById('tile-ref-info');
+  const tileStatsInfo = document.getElementById('tile-stats-info');
+
+  let currentTelegramId = null;
 
   function switchView(targetId) {
     views.forEach((v) => {
@@ -34,38 +43,24 @@
       }
     });
   }
-
-  // Bosh sahifadagi tugmalar
-  if (homeGoExchange) {
-    homeGoExchange.addEventListener('click', () => {
-      switchView('view-exchange');
-    });
-  }
-
-  if (homeGoFriends) {
-    homeGoFriends.addEventListener('click', () => {
-      switchView('view-friends');
-    });
-  }
-
-  if (homeGoProfile) {
-    homeGoProfile.addEventListener('click', () => {
-      switchView('view-profile');
-    });
-  }
-
-  if (homeGoHelp) {
-    homeGoHelp.addEventListener('click', () => {
-      switchView('view-help');
-    });
-  }
-
   navItems.forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-target');
       switchView(target);
     });
   });
+
+  // Bosh sahifadagi mozayka tile'lari bo'limlarga o'tkazadi
+  if (homeTiles && homeTiles.length) {
+    homeTiles.forEach((tile) => {
+      tile.addEventListener('click', () => {
+        const target = tile.getAttribute('data-target');
+        if (target) {
+          switchView(target);
+        }
+      });
+    });
+  }
 
   // --- Profil va statistikani backend + Telegram WebApp dan olish ---
   async function loadFromBackend() {
@@ -104,6 +99,29 @@
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
 
+      // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
+      if (homeUsername) {
+        homeUsername.textContent = meData.user.username ? '@' + meData.user.username : u.username ? '@' + u.username : 'Foydalanuvchi';
+      }
+      if (homeSlotsShort) {
+        homeSlotsShort.textContent = `Slotlar: ${activeSlots}/${totalSlots}`;
+      }
+      if (tileSlotsInfo) {
+        tileSlotsInfo.textContent = `${activeSlots} / ${totalSlots} ochiq`;
+      }
+      if (tileFriendsInfo) {
+        const friendsCount = (friendsData.friends && friendsData.friends.length) || 0;
+        tileFriendsInfo.textContent = `${friendsCount} ta`;
+      }
+      if (tileRefInfo) {
+        const invited = meData.user.invited_friends_count || 0;
+        tileRefInfo.textContent = `${invited} / 5`;
+      }
+      if (tileStatsInfo) {
+        const totalEx = meData.user.total_exchanges || 0;
+        tileStatsInfo.textContent = `${totalEx} almashish`;
+      }
+
       // --- Boshlang'ich qaysi view ochilishi ---
       const hasSlot1Link =
         slotsData &&
@@ -123,6 +141,8 @@
             buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
           });
         }
+        // Foydalanuvchi birinchi navbatda 1-slotni to'ldirishi uchun Profil/Slotlar bo'limiga yo'naltiramiz
+        switchView('view-profile');
       } else {
         // 1-slot allaqachon bor – navbar ochiq bo'ladi va asosiy bosh sahifa ko'rsatiladi
         if (navbar) {
@@ -373,13 +393,6 @@
   }
 
   // --- Tugmalar uchun oddiy handlerlar ---
-  const btnStartExchange = document.getElementById('btn-start-exchange');
-  const btnShareRef = document.getElementById('btn-share-ref');
-  const homeGoExchange = document.getElementById('home-go-exchange');
-  const homeGoFriends = document.getElementById('home-go-friends');
-  const homeGoProfile = document.getElementById('home-go-profile');
-  const homeGoHelp = document.getElementById('home-go-help');
-
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
       if (tg) {

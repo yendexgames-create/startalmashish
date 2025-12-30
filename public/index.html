@@ -22,14 +22,53 @@
 
       <main class="app-main">
         <section class="view view-active" id="view-home">
-          <div class="card hero-card">
-            <h2>🏠 Bosh sahifa</h2>
-            <p class="hero-text">Quyidagi bo'limlardan birini tanlab, botdan va Web ilovadan foydalanishni davom eting.</p>
-            <div class="home-actions">
-              <button id="home-go-exchange" class="primary-btn home-btn">🔁 Almashishni topish</button>
-              <button id="home-go-friends" class="secondary-btn home-btn">👥 Do'stlar</button>
-              <button id="home-go-profile" class="secondary-btn home-btn">👤 Profil va slotlar</button>
-              <button id="home-go-help" class="secondary-btn home-btn">❓ Foydalanishni o'rganish</button>
+          <div class="card" id="home-mini-profile">
+            <div class="home-profile-main">
+              <div class="home-profile-avatar">👤</div>
+              <div class="home-profile-text">
+                <div class="home-profile-username" id="home-username">@username</div>
+                <div class="home-profile-slots" id="home-slots-short">Slotlar: -/-</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card home-grid-card">
+            <div class="home-grid">
+              <button class="home-tile tile-slots" data-target="view-profile">
+                <div class="tile-icon">🎯</div>
+                <div class="tile-title">Slotlar</div>
+                <div class="tile-sub" id="tile-slots-info">-/- ochiq</div>
+              </button>
+
+              <button class="home-tile tile-exchange" data-target="view-exchange">
+                <div class="tile-icon">🔁</div>
+                <div class="tile-title">Almashish</div>
+                <div class="tile-sub">Boshlash</div>
+              </button>
+
+              <button class="home-tile tile-friends" data-target="view-friends">
+                <div class="tile-icon">🤝</div>
+                <div class="tile-title">Do'stlar</div>
+                <div class="tile-sub" id="tile-friends-info">0 ta</div>
+              </button>
+
+              <button class="home-tile tile-referral" data-target="view-friends">
+                <div class="tile-icon">🔗</div>
+                <div class="tile-title">Referal</div>
+                <div class="tile-sub" id="tile-ref-info">0 / 5</div>
+              </button>
+
+              <button class="home-tile tile-stats" data-target="view-profile">
+                <div class="tile-icon">📊</div>
+                <div class="tile-title">Statistika</div>
+                <div class="tile-sub" id="tile-stats-info">0 almashish</div>
+              </button>
+
+              <button class="home-tile tile-help" data-target="view-help">
+                <div class="tile-icon">⚙️</div>
+                <div class="tile-title">Foydalanish</div>
+                <div class="tile-sub">Qo'llanma</div>
+              </button>
             </div>
           </div>
         </section>
@@ -74,21 +113,26 @@
             <h3>Do'stlar ro'yxati</h3>
             <div id="friends-content">Hozircha ma'lumot yo'q.</div>
           </div>
+        </section>
 
-          <section class="view" id="view-help">
-            <div class="card" id="help-card">
-              <h2>❓ Foydalanishni o'rganish</h2>
-              <p class="hero-text">
-                Bu bo'limda bot va Web ilova bilan qanday ishlash bo'yicha qisqa ko'rsatmalar ko'rsatiladi.
-              </p>
-              <ul class="help-list">
-                <li>1. Botni /start qiling va kerakli ma'lumotlarni kiriting.</li>
-                <li>2. 1-slot uchun asosiy bot/link va tavsifni to'ldiring.</li>
-                <li>3. "Almashishni topish" tugmasidan almashish jarayonini boshlang.</li>
-                <li>4. Do'stlar taklif qilib, qo'shimcha slotlarni oching.</li>
-              </ul>
-            </div>
-          </section>
+        <section class="view" id="view-help">
+          <div class="card" id="help-card">
+            <h2>❓ Foydalanishni o'rganish</h2>
+            <p class="hero-text">
+              Quyidagi bosqichma-bosqich ko'rsatmalarga amal qilib, bot va Web ilovadan to'liq
+              foydalanishingiz mumkin.
+            </p>
+            <ul class="help-list">
+              <li><strong>1. Boshlash:</strong> Telegram’da botni <code>/start</code> qiling va kerakli ruxsatlarni bering (kanalga a’zolik, telefon raqam).
+              </li>
+              <li><strong>2. 1-slotni to‘ldirish:</strong> Bot sizdan asosiy bot/link manzilini va qisqacha tavsifni so‘raydi. Shu ma’lumotlar almashish paytida ishlatiladi.</li>
+              <li><strong>3. Web ilovani ochish:</strong> Bot chatidagi "Open" (🧩 Web ilova) tugmasini bosing va Web ilovani ishga tushiring.</li>
+              <li><strong>4. Profil va slotlarni ko‘rish:</strong> "Profil" bo‘limida o‘zingiz haqidagi ma’lumotlar, 1-slot linki va tavsifi, faol slotlar va qisqa statistika ko‘rsatiladi.</li>
+              <li><strong>5. Almashishni boshlash:</strong> "Bosh sahifa"dan yoki "Almashish" bo‘limidan "Almashishni topish" tugmasini bosib, almashish jarayonini boshlang. Bot chatda sizga keyingi qadamlarni ko‘rsatadi.</li>
+              <li><strong>6. Do‘stlarni taklif qilish:</strong> "Do‘stlar" bo‘limida botdagi tegishli menyu orqali referal linkingizni olib, do‘stlarga ulashing. Referallar orqali qo‘shimcha slotlar ochiladi.</li>
+              <li><strong>7. Natijalarni kuzatish:</strong> Qisqa statistika bo‘limida umumiy almashishlar, referallar va faol slotlar sonini nazorat qilib boring.</li>
+            </ul>
+          </div>
         </section>
       </main>
 
