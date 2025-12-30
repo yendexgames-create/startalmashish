@@ -27,7 +27,17 @@
   const tileRefInfo = document.getElementById('tile-ref-info');
   const tileStatsInfo = document.getElementById('tile-stats-info');
 
+  // Splash va tutorial elementlari
+  const splash = document.getElementById('splash');
+  const tutorialOverlay = document.getElementById('tutorial-overlay');
+  const tutorialHighlight = document.getElementById('tutorial-highlight');
+  const tutorialTooltip = document.getElementById('tutorial-tooltip');
+  const tutorialText = document.getElementById('tutorial-text');
+  const tutorialNext = document.getElementById('tutorial-next');
+  const tutorialSkip = document.getElementById('tutorial-skip');
+
   let currentTelegramId = null;
+  let tutorialStep = 0;
 
   function switchView(targetId) {
     views.forEach((v) => {
@@ -170,6 +180,15 @@
           navbar.style.display = 'flex';
         }
         switchView('view-home');
+
+        // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
+        const tutorialDone = window.localStorage.getItem('tutorial_done');
+        if (tutorialDone !== '1') {
+          // Bosh sahifa DOMi ko'rinishi uchun biroz kechiktiramiz
+          setTimeout(() => {
+            startTutorial();
+          }, 400);
+        }
       }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
@@ -447,5 +466,6 @@
   }
 
   // Boshlang'ich render
+  showSplashIfNeeded();
   loadFromBackend();
 })();
