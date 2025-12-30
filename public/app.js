@@ -63,22 +63,21 @@
 
       if (!meRes.ok) throw new Error('me failed');
       const meData = await meRes.json();
-      renderProfile(meData.user, u);
 
       let slotsData = null;
       if (slotsRes.ok) {
         slotsData = await slotsRes.json();
-        renderSlots(slotsData);
-      } else {
-        renderSlots();
       }
 
-      if (friendsRes.ok) {
-        const friendsData = await friendsRes.json();
-        renderFriends(friendsData.friends || []);
-      } else {
-        renderFriends([]);
-      }
+      const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
+
+      const links = (slotsData && Array.isArray(slotsData.links)) ? slotsData.links : [];
+      const activeSlots = links.filter((l) => l.link).length;
+      const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
+
+      renderProfile(meData.user, u, { activeSlots, totalSlots });
+      renderSlots(slotsData || null);
+      renderFriends(friendsData.friends || []);
 
       // --- Boshlang'ich qaysi view ochilishi ---
       const hasSlot1Link =
@@ -121,35 +120,63 @@
     }
   }
 
-  function renderProfile(userFromDb, tgUser) {
+  function renderProfile(userFromDb, tgUser, slotStats) {
     profileDiv.textContent = '';
-    const list = document.createElement('ul');
-
-    function addRow(label, value) {
-      const li = document.createElement('li');
-      li.innerHTML = `<strong>${label}:</strong> ${value || '-'}`;
-      list.appendChild(li);
-    }
 
     const fullNameFromTg = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
-    addRow('Ism', (userFromDb && userFromDb.name) || fullNameFromTg || '-');
-    addRow('Username', tgUser.username ? '@' + tgUser.username : userFromDb?.username || '-');
-    addRow('Telegram ID', tgUser.id);
+    const name = (userFromDb && userFromDb.name) || fullNameFromTg || '-';
+    const username = tgUser.username ? '@' + tgUser.username : userFromDb?.username || '-';
 
-    if (userFromDb) {
-      addRow('Telefon', userFromDb.phone || '-');
-      addRow('Asosiy link', userFromDb.main_link || '-');
-      addRow('Taklif qilingan do‘stlar', userFromDb.invited_friends_count || 0);
-      addRow('Almashishlar soni', userFromDb.total_exchanges || 0);
-      addRow('Slotlar', `${userFromDb.used_slots || 0}/${userFromDb.slots || 1}`);
+    const phone = userFromDb?.phone || '-';
+    const mainLink = userFromDb?.main_link || '-';
+    const invited = userFromDb?.invited_friends_count || 0;
+    const totalEx = userFromDb?.total_exchanges || 0;
 
-      quickStatsDiv.innerHTML =
-        `<p><strong>Umumiy almashishlar:</strong> ${userFromDb.total_exchanges || 0}</p>` +
-        `<p><strong>Taklif qilingan do‘stlar:</strong> ${userFromDb.invited_friends_count || 0} / 5</p>` +
-        `<p><strong>Faol slotlar:</strong> ${userFromDb.slots || 1} / 3</p>`;
-    }
+    const active = slotStats && typeof slotStats.activeSlots === 'number'
+      ? slotStats.activeSlots
+      : userFromDb?.used_slots || 0;
+    const total = slotStats && typeof slotStats.totalSlots === 'number'
+      ? slotStats.totalSlots
+      : userFromDb?.slots || 1;
 
-    profileDiv.appendChild(list);
+    profileDiv.innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar">${name.charAt(0).toUpperCase() || '?'}</div>
+        <div class="profile-main">
+          <div class="name">${name}</div>
+          <div class="username">${username}</div>
+          <div class="profile-contact">📞 ${phone}</div>
+          <div class="profile-contact">🔗 ${mainLink}</div>
+        </div>
+      </div>
+      <div class="profile-stats-row">
+        <div><span class="label">Almashishlar:</span> <span class="value">${totalEx}</span></div>
+        <div><span class="label">Do‘stlar:</span> <span class="value">${invited}</span></div>
+        <div><span class="label">Slotlar:</span> <span class="value">${active}/${total}</span></div>
+      </div>
+    `;
+
+    // Qisqa statistika (mini dashboard)
+    quickStatsDiv.innerHTML = `
+      <div class="stats-grid">
+        <div class="stats-item">
+          <div class="stats-label">Bugungi almashishlar</div>
+          <div class="stats-value">0</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-label">Umumiy almashishlar</div>
+          <div class="stats-value">${totalEx}</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-label">Referallar</div>
+          <div class="stats-value">${invited}</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-label">Faol slotlar</div>
+          <div class="stats-value">${active}/${total}</div>
+        </div>
+      </div>
+    `;
   }
 
   function renderSlots(slotsData) {
@@ -160,32 +187,47 @@
     const currentLink = slot1?.link || '';
     const currentDesc = slot1?.description || '';
 
-    const lockedText2 = totalSlots >= 2 ? '' : ' (qulf – 5 ta do‘stdan keyin ochiladi)';
-    const lockedText3 = totalSlots >= 3 ? '' : ' (qulf – qo‘shimcha takliflardan keyin ochiladi)';
+    const lockedText2 = totalSlots >= 2 ? '' : ' (5 ta do‘stdan keyin ochiladi)';
+    const lockedText3 = totalSlots >= 3 ? '' : ' (qo‘shimcha takliflardan keyin ochiladi)';
 
     slotsDiv.innerHTML = `
-      <div class="slot-view">
-        <p><strong>1-slot (asosiy):</strong> ${currentLink || 'Hali link kiritilmagan'}</p>
-        <p><strong>Tavsif:</strong> ${currentDesc || '-'}</p>
+      <div class="slot-card slot-card--active">
+        <div class="slot-card-header">
+          <div class="slot-card-title">1-slot (asosiy)</div>
+          <div class="slot-card-status">${currentLink ? '🟢 Faol' : '⚪ Kutilmoqda'}</div>
+        </div>
+        <div class="slot-card-link">${currentLink || 'Hali link kiritilmagan'}</div>
+        <div class="slot-card-desc">${currentDesc || 'Bu bot nima qiladi? Qisqacha yozib qo‘ying.'}</div>
+        <div class="slot-edit">
+          <label class="slot-label">1-slot uchun yangi link:</label>
+          <input id="slot1-link-input" class="slot-input" type="text" placeholder="https://t.me/yourbot?start=..." value="${currentLink || ''}" />
+          <label class="slot-label">Qisqacha tavsif:</label>
+          <textarea id="slot1-desc-input" class="slot-textarea" rows="2" placeholder="Bu bot nima qiladi?">${currentDesc || ''}</textarea>
+          <button id="slot1-save-btn" class="primary-btn slot-save-btn">✏️ Saqlash</button>
+          <p class="hint-text">Linkingiz va tavsif Web ilova va botdagi almashishlarda ishlatiladi.</p>
+        </div>
       </div>
-      <div class="slot-edit">
-        <label class="slot-label">1-slot uchun yangi link:</label>
-        <input id="slot1-link-input" class="slot-input" type="text" placeholder="https://t.me/yourbot?start=..." value="${currentLink || ''}" />
-        <label class="slot-label">Qisqacha tavsif:</label>
-        <textarea id="slot1-desc-input" class="slot-textarea" rows="2" placeholder="Bu bot nima qiladi?"></textarea>
-        <button id="slot1-save-btn" class="primary-btn slot-save-btn">Saqlash</button>
-        <p class="hint-text">Linkingiz va tavsif Web ilova va botdagi almashishlarda ishlatiladi.</p>
+      <div class="slot-card ${totalSlots >= 2 ? '' : 'slot-card--locked'}">
+        <div class="slot-card-header">
+          <div class="slot-card-title">2-slot</div>
+          <div class="slot-card-status">${totalSlots >= 2 ? '🟢 Ochiq' : '🔒 Qulfda'}</div>
+        </div>
+        <div class="slot-card-desc">
+          ${totalSlots >= 2 ? 'Bu slot keyinroq Web ilovada tahrir qilinadi.' : 'Yana do‘stlar taklif qiling, 5 ta do‘stdan keyin ochiladi.'}
+          ${lockedText2}
+        </div>
       </div>
-      <div class="slot-other-info">
-        <p><strong>2-slot:</strong> ${totalSlots >= 2 ? 'Mavjud, keyinroq Web ilovada tahrir qilinadi.' : 'Hozircha qulfda' + lockedText2}</p>
-        <p><strong>3-slot:</strong> ${totalSlots >= 3 ? 'Mavjud, keyinroq Web ilovada tahrir qilinadi.' : 'Hozircha qulfda' + lockedText3}</p>
+      <div class="slot-card ${totalSlots >= 3 ? '' : 'slot-card--locked'}">
+        <div class="slot-card-header">
+          <div class="slot-card-title">3-slot</div>
+          <div class="slot-card-status">${totalSlots >= 3 ? '🟢 Ochiq' : '🔒 Qulfda'}</div>
+        </div>
+        <div class="slot-card-desc">
+          ${totalSlots >= 3 ? 'Bu slot keyinroq Web ilovada tahrir qilinadi.' : 'Ko‘proq referal taklif qilganingizda ochiladi.'}
+          ${lockedText3}
+        </div>
       </div>
     `;
-
-    const descEl = document.getElementById('slot1-desc-input');
-    if (descEl && currentDesc) {
-      descEl.value = currentDesc;
-    }
 
     const saveBtn = document.getElementById('slot1-save-btn');
     if (saveBtn) {
@@ -261,11 +303,23 @@
     const items = friends.map((f) => {
       const name = f.name || '-';
       const username = f.username ? '@' + f.username : '-';
-      const profile = f.profile_link || '-';
-      return `<li><strong>${name}</strong> (${username}) – <a href="${profile}" target="_blank">Profil</a></li>`;
+      const profile = f.profile_link || '#';
+      const initial = (name && name.charAt(0).toUpperCase()) || (username && username.charAt(1).toUpperCase()) || '?';
+      return `
+        <li class="friend-item">
+          <div class="friend-main">
+            <div class="friend-avatar">${initial}</div>
+            <div>
+              <div class="friend-name">${name}</div>
+              <div class="friend-username">${username}</div>
+            </div>
+          </div>
+          <div class="friend-link"><a href="${profile}" target="_blank">🔗 Profil</a></div>
+        </li>
+      `;
     });
 
-    friendsDiv.innerHTML = `<ul>${items.join('')}</ul>`;
+    friendsDiv.innerHTML = `<ul class="friends-list">${items.join('')}</ul>`;
   }
 
   // --- Tugmalar uchun oddiy handlerlar ---

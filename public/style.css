@@ -164,6 +164,67 @@ body {
   margin-bottom: 10px;
 }
 
+/* Profil karta (Chess.com style) */
+#profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7fa650, #8bc34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.profile-main {
+  flex: 1;
+}
+
+.profile-main .name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.profile-main .username {
+  font-size: 0.85rem;
+  color: #b0b0b0;
+}
+
+.profile-contact {
+  font-size: 0.82rem;
+  color: #b0b0b0;
+}
+
+.profile-stats-row {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.profile-stats-row span.label {
+  color: #b0b0b0;
+}
+
+.profile-stats-row span.value {
+  color: #7fa650;
+  font-weight: 600;
+}
+
 .primary-btn,
 .secondary-btn {
   display: inline-flex;
@@ -254,4 +315,167 @@ body {
 #profile-content li {
   margin-bottom: 4px;
   font-size: 0.94rem;
+}
+
+/* Slot kartalari */
+.slot-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #333333;
+  background: #1e1e1e;
+  font-size: 0.9rem;
+}
+
+.slot-card--active {
+  border-color: #7fa650;
+  background: #262626;
+}
+
+.slot-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.slot-card-title {
+  font-weight: 600;
+}
+
+.slot-card-status {
+  font-size: 0.8rem;
+  color: #b0b0b0;
+}
+
+.slot-card-link {
+  font-size: 0.85rem;
+  color: #7fa650;
+  word-break: break-all;
+}
+
+.slot-card-desc {
+  margin-top: 4px;
+  font-size: 0.83rem;
+  color: #b0b0b0;
+}
+
+.slot-edit {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slot-label {
+  font-size: 0.8rem;
+  color: #b0b0b0;
+}
+
+.slot-input,
+.slot-textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #333333;
+  background: #1e1e1e;
+  color: #ffffff;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.slot-input:focus,
+.slot-textarea:focus {
+  outline: none;
+  border-color: #7fa650;
+}
+
+.slot-save-btn {
+  margin-top: 4px;
+  width: 100%;
+}
+
+.slot-other-info {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #b0b0b0;
+}
+
+/* Do'stlar ro'yxati */
+.friends-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.88rem;
+}
+
+.friend-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friend-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.friend-name {
+  color: #ffffff;
+}
+
+.friend-username {
+  font-size: 0.8rem;
+  color: #b0b0b0;
+}
+
+.friend-link a {
+  color: #7fa650;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.friend-link a:hover {
+  text-decoration: underline;
+}
+
+/* Statistika grid */
+#quick-stats-card {
+  margin-top: 10px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.stats-item {
+  background: #1e1e1e;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.stats-label {
+  color: #b0b0b0;
+}
+
+.stats-value {
+  margin-top: 2px;
+  color: #7fa650;
+  font-weight: 600;
 }
