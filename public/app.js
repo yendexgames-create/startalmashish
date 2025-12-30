@@ -39,6 +39,70 @@
   let currentTelegramId = null;
   let tutorialStep = 0;
 
+  // --- Qor yog'ishi animatsiyasi (faqat qish oylarida) ---
+  function initSnowIfSeason() {
+    const month = new Date().getMonth(); // 0 = yanvar, 11 = dekabr
+    if (!(month === 11 || month === 0)) return;
+
+    const canvas = document.getElementById('snow');
+    if (!canvas || !canvas.getContext) return;
+
+    const ctx = canvas.getContext('2d');
+    let w;
+    let h;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    const snowflakes = [];
+    const COUNT = 80;
+
+    for (let i = 0; i < COUNT; i++) {
+      snowflakes.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 2 + 1,
+        d: Math.random() * 1 + 0.5
+      });
+    }
+
+    function drawSnow() {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath();
+      for (const f of snowflakes) {
+        ctx.moveTo(f.x, f.y);
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      moveSnow();
+    }
+
+    function moveSnow() {
+      for (const f of snowflakes) {
+        f.y += f.d;
+        f.x += Math.sin(f.y * 0.01) * 0.5;
+
+        if (f.y > h) {
+          f.y = -5;
+          f.x = Math.random() * w;
+        }
+      }
+    }
+
+    function animateSnow() {
+      drawSnow();
+      window.requestAnimationFrame(animateSnow);
+    }
+
+    animateSnow();
+  }
+
   function switchView(targetId) {
     views.forEach((v) => {
       v.classList.toggle('view-active', v.id === targetId);
@@ -467,5 +531,6 @@
 
   // Boshlang'ich render
   showSplashIfNeeded();
+  initSnowIfSeason();
   loadFromBackend();
 })();
