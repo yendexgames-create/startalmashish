@@ -80,6 +80,9 @@ app.get('/api/me', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
+    const invited = user.invited_friends_count || 0;
+    const effectiveSlots = Math.min(1 + Math.floor(invited / 5), 3);
+
     return res.json({
       user: {
         telegram_id: user.telegram_id,
@@ -88,7 +91,7 @@ app.get('/api/me', async (req, res) => {
         phone: user.phone,
         main_link: user.main_link,
         description: user.description,
-        slots: user.slots,
+        slots: effectiveSlots,
         used_slots: user.used_slots,
         invited_friends_count: user.invited_friends_count,
         total_exchanges: user.total_exchanges
@@ -121,7 +124,10 @@ app.post('/api/slots', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
-    if (slotIndex > (user.slots || 1)) {
+    const invited = user.invited_friends_count || 0;
+    const effectiveSlots = Math.min(1 + Math.floor(invited / 5), 3);
+
+    if (slotIndex > effectiveSlots) {
       return res.status(400).json({ error: 'Bu slot siz uchun hali ochilmagan' });
     }
 
@@ -147,10 +153,13 @@ app.get('/api/slots', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
+    const invited = user.invited_friends_count || 0;
+    const effectiveSlots = Math.min(1 + Math.floor(invited / 5), 3);
+
     const links = await getUserLinksAll(telegramId);
 
     return res.json({
-      slots: user.slots || 1,
+      slots: effectiveSlots,
       links
     });
   } catch (e) {

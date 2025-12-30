@@ -141,7 +141,9 @@
 
     profileDiv.innerHTML = `
       <div class="profile-header">
-        <div class="profile-avatar">${name.charAt(0).toUpperCase() || '?'}</div>
+        <div class="profile-avatar">
+          ${tgUser.photo_url ? `<img src="${tgUser.photo_url}" alt="avatar" />` : (name.charAt(0).toUpperCase() || '?')}
+        </div>
         <div class="profile-main">
           <div class="name">${name}</div>
           <div class="username">${username}</div>
@@ -153,6 +155,10 @@
         <div><span class="label">Almashishlar:</span> <span class="value">${totalEx}</span></div>
         <div><span class="label">Do‘stlar:</span> <span class="value">${invited}</span></div>
         <div><span class="label">Slotlar:</span> <span class="value">${active}/${total}</span></div>
+      </div>
+      <div class="profile-actions">
+        <button id="btn-home" class="secondary-btn profile-btn">Bosh sahifa</button>
+        <button id="btn-help" class="primary-btn profile-btn">Savol va tavsiyalar</button>
       </div>
     `;
 
@@ -177,6 +183,27 @@
         </div>
       </div>
     `;
+
+    const btnHome = document.getElementById('btn-home');
+    if (btnHome) {
+      btnHome.addEventListener('click', () => {
+        switchView('view-exchange');
+      });
+    }
+
+    const btnHelp = document.getElementById('btn-help');
+    if (btnHelp) {
+      btnHelp.addEventListener('click', () => {
+        if (tg && tg.showPopup) {
+          tg.showPopup({
+            title: 'Savol va tavsiyalar',
+            message:
+              'Savol va tavsiyalar uchun alohida bo‘lim tez orada qo‘shiladi. Hozircha savollaringizni shu bot chatida yozib qoldiring.',
+            buttons: [{ id: 'ok', type: 'close', text: 'Yopish' }]
+          });
+        }
+      });
+    }
   }
 
   function renderSlots(slotsData) {
