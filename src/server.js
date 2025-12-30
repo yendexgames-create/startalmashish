@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from './db.js';
+import { db, upsertUserLink } from './db.js';
 
 // Botlarni ishga tushiramiz (side-effect imports)
 import './all_bots.js';
@@ -96,6 +96,40 @@ app.get('/api/me', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/me xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Slot ma'lumotini yangilash (hozircha faqat 1-slotni tahrirlash uchun ishlatamiz)
+app.post('/api/slots', async (req, res) => {
+  try {
+    const { telegram_id, slot_index, link, description } = req.body || {};
+
+    const telegramId = parseInt(telegram_id, 10);
+    const slotIndex = parseInt(slot_index || 1, 10) || 1;
+
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id body da kerak' });
+    }
+
+    if (!link || typeof link !== 'string' || !link.startsWith('http')) {
+      return res.status(400).json({ error: 'link noto‘g‘ri yoki yo‘q' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    if (slotIndex > (user.slots || 1)) {
+      return res.status(400).json({ error: 'Bu slot siz uchun hali ochilmagan' });
+    }
+
+    await upsertUserLink(telegramId, slotIndex, link, description || null);
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('/api/slots POST xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });

@@ -12,6 +12,8 @@
   const friendsDiv = document.getElementById('friends-content');
   const quickStatsDiv = document.getElementById('quick-stats-content');
 
+  let currentTelegramId = null;
+
   // --- Navigatsiya (pastki navbar) ---
   const navItems = document.querySelectorAll('.nav-item');
   const views = document.querySelectorAll('.view');
@@ -41,6 +43,7 @@
 
     const u = tg.initDataUnsafe.user;
     const telegramId = u.id;
+    currentTelegramId = telegramId;
 
     try {
       const [meRes, slotsRes, friendsRes] = await Promise.all([
@@ -107,32 +110,97 @@
   }
 
   function renderSlots(slotsData) {
-    if (!slotsData) {
-      slotsDiv.innerHTML =
-        '<ul><li><strong>1-slot:</strong> Hali link kiritilmagan</li><li><strong>2-slot:</strong> Qulf (5 ta do‘stdan keyin ochiladi)</li><li><strong>3-slot:</strong> Qulf (yana qo‘shimcha takliflar bilan ochiladi)</li></ul>';
-      return;
+    const totalSlots = slotsData?.slots || 1;
+    const links = slotsData?.links || [];
+
+    const slot1 = links.find((l) => l.slot_index === 1);
+    const currentLink = slot1?.link || '';
+    const currentDesc = slot1?.description || '';
+
+    const lockedText2 = totalSlots >= 2 ? '' : ' (qulf – 5 ta do‘stdan keyin ochiladi)';
+    const lockedText3 = totalSlots >= 3 ? '' : ' (qulf – qo‘shimcha takliflardan keyin ochiladi)';
+
+    slotsDiv.innerHTML = `
+      <div class="slot-view">
+        <p><strong>1-slot (asosiy):</strong> ${currentLink || 'Hali link kiritilmagan'}</p>
+        <p><strong>Tavsif:</strong> ${currentDesc || '-'}</p>
+      </div>
+      <div class="slot-edit">
+        <label class="slot-label">1-slot uchun yangi link:</label>
+        <input id="slot1-link-input" class="slot-input" type="text" placeholder="https://t.me/yourbot?start=..." value="${currentLink || ''}" />
+        <label class="slot-label">Qisqacha tavsif:</label>
+        <textarea id="slot1-desc-input" class="slot-textarea" rows="2" placeholder="Bu bot nima qiladi?"></textarea>
+        <button id="slot1-save-btn" class="primary-btn slot-save-btn">Saqlash</button>
+        <p class="hint-text">Linkingiz va tavsif Web ilova va botdagi almashishlarda ishlatiladi.</p>
+      </div>
+      <div class="slot-other-info">
+        <p><strong>2-slot:</strong> ${totalSlots >= 2 ? 'Mavjud, keyinroq Web ilovada tahrir qilinadi.' : 'Hozircha qulfda' + lockedText2}</p>
+        <p><strong>3-slot:</strong> ${totalSlots >= 3 ? 'Mavjud, keyinroq Web ilovada tahrir qilinadi.' : 'Hozircha qulfda' + lockedText3}</p>
+      </div>
+    `;
+
+    const descEl = document.getElementById('slot1-desc-input');
+    if (descEl && currentDesc) {
+      descEl.value = currentDesc;
     }
 
-    const totalSlots = slotsData.slots || 1;
-    const links = slotsData.links || [];
-    const items = [];
-
-    for (let i = 1; i <= 3; i++) {
-      const slot = links.find((l) => l.slot_index === i);
-      let text = '';
-      if (i <= totalSlots) {
-        if (slot && slot.link) {
-          text = `<strong>${i}-slot:</strong> ${slot.link}`;
-        } else {
-          text = `<strong>${i}-slot:</strong> Hali link kiritilmagan`;
+    const saveBtn = document.getElementById('slot1-save-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        if (!currentTelegramId) {
+          if (tg) {
+            tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+          }
+          return;
         }
-      } else {
-        text = `<strong>${i}-slot:</strong> Qulf (takliflar orqali ochiladi)`;
-      }
-      items.push(`<li>${text}</li>`);
-    }
 
-    slotsDiv.innerHTML = `<ul>${items.join('')}</ul>`;
+        const linkInput = document.getElementById('slot1-link-input');
+        const descInput = document.getElementById('slot1-desc-input');
+        const newLink = linkInput.value.trim();
+        const newDesc = descInput.value.trim();
+
+        if (!newLink || !newLink.startsWith('http')) {
+          if (tg) tg.showAlert('Iltimos, to‘g‘ri link kiriting (https:// bilan).');
+          return;
+        }
+
+        try {
+          const resp = await fetch('/api/slots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              slot_index: 1,
+              link: newLink,
+              description: newDesc
+            })
+          });
+
+          if (!resp.ok) {
+            const data = await resp.json().catch(() => null);
+            const msg = data && data.error ? data.error : 'Saqlashda xatolik yuz berdi.';
+            if (tg) tg.showAlert(msg);
+            return;
+          }
+
+          if (tg) {
+            tg.showPopup({
+              title: 'Saqlangan',
+              message: '1-slot linkingiz yangilandi. Endi almashishlarda shu link ishlatiladi.',
+              buttons: [{ id: 'ok', type: 'close', text: 'OK' }]
+            });
+          }
+
+          // Qayta yuklab, yangilangan maʼlumotni ko'rsatamiz
+          loadFromBackend();
+        } catch (e) {
+          console.error('Slot saqlashda xato:', e);
+          if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+        }
+      });
+    }
   }
 
   function renderFriends(friends) {

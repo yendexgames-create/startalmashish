@@ -369,12 +369,6 @@ bot.start(async (ctx) => {
     );
     // referrerId bo'lsa, keyingi bosqichda saqlash uchun state'ga qo'yamiz
     setState(telegramId, 'WAIT_PHONE', { referrerId });
-  } else if (!existing.main_link) {
-    await ctx.reply(
-      'Siz ro‘yxatdan o‘tgansiz, lekin hali almashish linkini kiritmagansiz.\nIltimos, bot linkingizni yuboring (masalan, https://t.me/yourbot?start=...).',
-      Markup.removeKeyboard()
-    );
-    setState(telegramId, 'WAIT_LINK');
   } else {
     await ctx.reply('Asosiy menyu', mainMenuKeyboard());
     clearState(telegramId);
@@ -478,8 +472,8 @@ bot.on('contact', async (ctx) => {
   }
 
   await ctx.reply(
-    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi esa start almashish uchun ishlatiladigan bot linkingizni yuboring.\nMasalan: https://t.me/yourbot?start=... ',
-    Markup.removeKeyboard()
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi asosiy menyudan foydalanishingiz mumkin. Profil va slotlaringizni Web ilova orqali boshqarishingiz mumkin.',
+    mainMenuKeyboard()
   );
 
   // Agar referal orqali kelgan bo'lsa, taklif qilgan odamga xabar yuboramiz
@@ -505,7 +499,7 @@ bot.on('contact', async (ctx) => {
     }
   }
 
-  setState(telegramId, 'WAIT_LINK');
+  clearState(telegramId);
 });
 
 bot.on('text', async (ctx) => {
