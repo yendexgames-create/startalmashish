@@ -10,3 +10,4 @@ if (!process.env.BOT_TOKEN) {
 export const BOT_TOKEN = process.env.BOT_TOKEN;
 export const REQUIRED_CHANNEL = process.env.REQUIRED_CHANNEL || '@xavsiz_almash';
 export const ADMIN_BOT_TOKEN = process.env.ADMIN_BOT_TOKEN;
+export const WEBAPP_URL = process.env.WEBAPP_URL || 'https://example.com/webapp';

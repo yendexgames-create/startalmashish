@@ -1,5 +1,5 @@
 import { Telegraf, Markup } from 'telegraf';
-import { BOT_TOKEN, REQUIRED_CHANNEL } from './config.js';
+import { BOT_TOKEN, REQUIRED_CHANNEL, WEBAPP_URL } from './config.js';
 import { db, initDb, getSetting, getChannels, recordChannelJoin, upsertUserLink, getUserLinks } from './db.js';
 
 initDb();
@@ -112,7 +112,15 @@ function mainMenuKeyboard() {
   return Markup.keyboard([
     ['🔁 Almashishni topish'],
     ['👥 Do‘st taklif qilish', '📚 Do‘stlar'],
-    ['👤 Profil', '✉️ Savol va takliflar']
+    ['👤 Profil', '✉️ Savol va takliflar'],
+    [
+      {
+        text: '🧩 Web ilova',
+        web_app: {
+          url: WEBAPP_URL
+        }
+      }
+    ]
   ]).resize();
 }
 
@@ -732,6 +740,14 @@ bot.on('text', async (ctx) => {
 
   if (text === '✉️ Savol va takliflar') {
     await ctx.reply('Savol va takliflaringizni shu yerga yozib qoldiring. (Admin uchun aloqa: @Cyberphantom001)');
+    return;
+  }
+
+  if (text === '🧩 Web ilova') {
+    await ctx.reply(
+      'Web ilova ochilmoqda. Agar avtomatik ochilmasa, pastdagi tugma orqali oching.',
+      Markup.inlineKeyboard([[Markup.button.webApp('🧩 Web ilova', WEBAPP_URL)]])
+    );
     return;
   }
 

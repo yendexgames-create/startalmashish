@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Start Almashish WebApp</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="snow-layer" aria-hidden="true"></div>
+    <div id="app">
+      <header class="app-header">
+        <h1>Start Almashish</h1>
+        <p class="subtitle">Start almashish uchun qulay mini ilova</p>
+      </header>
+
+      <main class="app-main">
+        <section class="view view-active" id="view-exchange">
+          <div class="card hero-card">
+            <h2>🔁 Almashishni topish</h2>
+            <p class="hero-text">
+              Bu bo'limda siz botdagi slotlaringizdan birini tanlab, almashish uchun eng mos hamkorni topasiz.
+            </p>
+            <button id="btn-start-exchange" class="primary-btn">Almashishni boshlash</button>
+          </div>
+
+          <div class="card" id="quick-stats-card">
+            <h3>Qisqa statistika</h3>
+            <div id="quick-stats-content">Yuklanmoqda...</div>
+          </div>
+        </section>
+
+        <section class="view" id="view-friends">
+          <div class="card">
+            <h2>👥 Do'stlar</h2>
+            <button id="btn-share-ref" class="secondary-btn">Do'st taklif qilish</button>
+            <p class="hint-text">
+              5 ta do'st taklif qilsangiz, sizga qo'shimcha slotlar ochiladi.
+            </p>
+          </div>
+
+          <div class="card" id="friends-card">
+            <h3>Do'stlar ro'yxati</h3>
+            <div id="friends-content">Hozircha ma'lumot yo'q.</div>
+          </div>
+        </section>
+
+        <section class="view" id="view-profile">
+          <div class="card" id="profile-card">
+            <h2>👤 Profil</h2>
+            <div id="profile-content">Yuklanmoqda...</div>
+          </div>
+
+          <div class="card" id="slots-card">
+            <h3>Slotlar</h3>
+            <div id="slots-content">Yuklanmoqda...</div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav">
+        <button class="nav-item nav-item-active" data-target="view-exchange">
+          <span class="nav-icon">🔁</span>
+          <span class="nav-label">Almashish</span>
+        </button>
+        <button class="nav-item" data-target="view-friends">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Do'stlar</span>
+        </button>
+        <button class="nav-item" data-target="view-profile">
+          <span class="nav-icon">👤</span>
+          <span class="nav-label">Profil</span>
+        </button>
+      </nav>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
