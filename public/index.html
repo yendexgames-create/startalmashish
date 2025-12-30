@@ -8,6 +8,7 @@
   </head>
   <body>
     <canvas id="snow"></canvas>
+
     <!-- Splash screen (birinchi kirishda ko'rinadi) -->
     <div id="splash" class="splash hidden">
       <div class="splash-content">
@@ -16,6 +17,26 @@
         <p>Xavfsiz Almashish ilovamizga</p>
       </div>
     </div>
+
+    <!-- Tutorial overlay (qadamlar bo'yicha tushuntirish) -->
+    <div id="tutorial-overlay" class="tutorial-overlay hidden">
+      <div class="tutorial-backdrop"></div>
+      <div id="tutorial-highlight" class="tutorial-highlight"></div>
+      <div id="tutorial-tooltip" class="tutorial-tooltip">
+        <div class="tutorial-text" id="tutorial-text"></div>
+        <div class="tutorial-controls">
+          <button id="tutorial-skip" class="secondary-btn tutorial-btn">O'tkazib yuborish</button>
+          <button id="tutorial-next" class="primary-btn tutorial-btn">Keyingi</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="app">
+      <header class="app-header">
+        <div class="header-left">☰</div>
+        <div class="header-center">
+          <h1>Xavfsiz Almashish</h1>
+          <p class="subtitle">Start almashish uchun qulay mini ilova</p>
         </div>
         <div class="header-right">
           <span class="status-dot"></span>

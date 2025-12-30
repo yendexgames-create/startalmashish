@@ -245,6 +245,24 @@
         }
         switchView('view-home');
 
+        function showSplashIfNeeded() {
+          if (!splash) return;
+          const done = window.localStorage.getItem('splash_done');
+          if (done === '1') {
+            splash.classList.add('hidden');
+            return;
+          }
+          splash.classList.remove('hidden');
+          setTimeout(() => {
+            splash.style.opacity = '0';
+            setTimeout(() => {
+              splash.classList.add('hidden');
+              splash.style.opacity = '';
+            }, 500);
+          }, 2500);
+          window.localStorage.setItem('splash_done', '1');
+        }
+
         // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
         const tutorialDone = window.localStorage.getItem('tutorial_done');
         if (tutorialDone !== '1') {
@@ -253,6 +271,7 @@
             startTutorial();
           }, 400);
         }
+        showSplashIfNeeded();
       }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
