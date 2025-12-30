@@ -18,18 +18,25 @@
   const navItems = document.querySelectorAll('.nav-item');
   const views = document.querySelectorAll('.view');
 
+  function switchView(targetId) {
+    views.forEach((v) => {
+      v.classList.toggle('view-active', v.id === targetId);
+    });
+
+    navItems.forEach((b) => {
+      const t = b.getAttribute('data-target');
+      if (t === targetId) {
+        b.classList.add('nav-item-active');
+      } else {
+        b.classList.remove('nav-item-active');
+      }
+    });
+  }
+
   navItems.forEach((btn) => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-target');
-
-      // viewlarni almashtirish
-      views.forEach((v) => {
-        v.classList.toggle('view-active', v.id === target);
-      });
-
-      // aktiv nav itemni belgilash
-      navItems.forEach((b) => b.classList.remove('nav-item-active'));
-      btn.classList.add('nav-item-active');
+      switchView(target);
     });
   });
 
@@ -56,8 +63,9 @@
       const meData = await meRes.json();
       renderProfile(meData.user, u);
 
+      let slotsData = null;
       if (slotsRes.ok) {
-        const slotsData = await slotsRes.json();
+        slotsData = await slotsRes.json();
         renderSlots(slotsData);
       } else {
         renderSlots();
@@ -69,12 +77,35 @@
       } else {
         renderFriends([]);
       }
+
+      // --- Boshlang'ich qaysi view ochilishi ---
+      const hasSlot1Link =
+        slotsData &&
+        Array.isArray(slotsData.links) &&
+        slotsData.links.some((l) => l.slot_index === 1 && l.link);
+
+      if (!hasSlot1Link) {
+        // 1-slot uchun link yo'q – foydalanuvchini slotlar bo'limiga olib boramiz
+        switchView('view-slots');
+        if (tg) {
+          tg.showPopup({
+            title: '1-slot uchun link kerak',
+            message:
+              'Avval 1-slot uchun bot/link manzilini kiriting. Bu link almashish jarayonlarida ishlatiladi.',
+            buttons: [{ id: 'ok', type: 'close', text: 'Tushunarli' }]
+          });
+        }
+      } else {
+        // Asosiy maʼlumotlar tayyor – profil bo'limini ochamiz
+        switchView('view-profile');
+      }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
       // Foydalanuvchiga eng kamida Telegram profili ko‘rinib tursin
       renderProfile(null, tg.initDataUnsafe.user);
       renderSlots();
       renderFriends([]);
+      switchView('view-profile');
     }
   }
 
