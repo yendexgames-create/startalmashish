@@ -183,6 +183,21 @@ app.post('/api/slots', async (req, res) => {
 
     await upsertUserLink(telegramId, slotIndex, link, description || null);
 
+    // Agar 1-slot saqlanayotgan bo'lsa, users jadvalidagi main_link va description ni ham sinxronlashtiramiz,
+    // shunda botdagi profil va matching ham aynan shu linkdan foydalanadi.
+    if (slotIndex === 1) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE users SET main_link = ?, description = ? WHERE telegram_id = ?',
+          [link, description || null, telegramId],
+          (err) => {
+            if (err) return reject(err);
+            resolve();
+          }
+        );
+      });
+    }
+
     return res.json({ ok: true });
   } catch (e) {
     console.error('/api/slots POST xato:', e);
