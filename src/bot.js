@@ -1261,6 +1261,9 @@ Profil: ${uProfile}
 Sizning quyidagi linkingiz uchun:
 ${uLink}
 
+Iltimos, pastdagi tugmalar orqali qaror bering.
+Agar xohlasangiz, bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, almashish tafsilotlarini ko'rishingiz mumkin.
+
 Rozimisiz?`;
 
       await bot.telegram.sendMessage(
