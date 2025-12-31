@@ -1647,16 +1647,13 @@ bot.action('match_yes', async (ctx) => {
   }
 
   const candidateText =
-    `Kimdir siz bilan start almashmoqchi:
-
-Ism: ${uName}
-Username: ${uUsername}
-Profil: ${uProfile}
+    `Kimdir siz bilan start almashmoqchi.
 
 Sizning quyidagi linkingiz uchun:
 ${uLink}
 
-Rozimisiz?`;
+Iltimos, almashish tafsilotlarini Web ilova ichida ko'rib chiqing.
+Bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochishingiz mumkin.`;
 
   await bot.telegram.sendMessage(candidateTelegramId, candidateText);
 });
