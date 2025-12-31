@@ -115,6 +115,69 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// Foydalanuvchi uchun bitta tasodifiy almashish kandidati qaytarish (WebApp kartasi uchun)
+app.get('/api/exchange/match', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user || !user.main_link) {
+      return res.json({ candidate: null });
+    }
+
+    const currentMainLink = user.main_link ? user.main_link.trim() : null;
+
+    db.all(
+      'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
+      [telegramId],
+      (err, rows) => {
+        if (err) {
+          console.error('/api/exchange/match query xato:', err);
+          return res.status(500).json({ error: 'Server xatosi' });
+        }
+
+        if (!rows || rows.length === 0) {
+          return res.json({ candidate: null });
+        }
+
+        const filtered = rows.filter((row) => {
+          // Bir xil user bo'lmasligi (zaxira)
+          if (row.telegram_id === telegramId) return false;
+
+          // Asosiy linki ham aynan bir xil bo'lmasin
+          if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
+
+          return true;
+        });
+
+        if (!filtered.length) {
+          return res.json({ candidate: null });
+        }
+
+        const randomIndex = Math.floor(Math.random() * filtered.length);
+        const c = filtered[randomIndex];
+
+        return res.json({
+          candidate: {
+            telegram_id: c.telegram_id,
+            name: c.name,
+            username: c.username,
+            profile_link: c.profile_link,
+            main_link: c.main_link,
+            description: c.description
+          }
+        });
+      }
+    );
+  } catch (e) {
+    console.error('/api/exchange/match xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // Foydalanuvchi uchun hozircha boshqa foydalanuvchilar bormi-yo'qligini tekshirish (soddalashtirilgan)
 // Asl murakkab filtrlar (o'zi bilan tenglashtirmaslik, bir xil bot/linkni chetga olish) bot ichidagi
 // getRandomCandidateForUser funksiyasida ishlaydi. Bu yerda faqat "umuman olganda" sherik bo'lishi

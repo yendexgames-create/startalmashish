@@ -5,7 +5,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, '..', 'data.sqlite');
+// Ma'lumotlar bazasi fayl yo'lini moslashuvchan qilamiz:
+// - Agar DB_PATH berilgan bo'lsa, aynan shu fayl ishlatiladi
+// - Aks holda, agar DB_DIR berilgan bo'lsa, o'sha katalog ichida data.sqlite ishlatiladi
+// - Hech narsa bo'lmasa, eski holat: loyiha ichidagi ..\data.sqlite
+const envDbPath = process.env.DB_PATH;
+const envDbDir = process.env.DB_DIR;
+
+let dbPath;
+if (envDbPath && envDbPath.trim()) {
+  dbPath = envDbPath.trim();
+} else if (envDbDir && envDbDir.trim()) {
+  dbPath = path.join(envDbDir.trim(), 'data.sqlite');
+} else {
+  dbPath = path.join(__dirname, '..', 'data.sqlite');
+}
 
 sqlite3.verbose();
 export const db = new sqlite3.Database(dbPath);

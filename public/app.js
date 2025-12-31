@@ -757,14 +757,27 @@
   function fillExchangeCardFromCandidate() {
     if (!exchangeCard) return;
 
-    // Hozircha WebApp ichida real sherik ma'lumotlarini emas, faqat umumiy almashish kartasini ko'rsatamiz.
-    // HTML ichidagi default matnlar (Foydalanuvchi nomi, Bot nomi va h.k.) saqlanib qoladi.
+    // Agar real kandidat ma'lumoti bo'lsa, kartani shu ma'lumotlar bilan to'ldiramiz
+    if (currentExchangeCandidate) {
+      if (exchangeUserName) {
+        exchangeUserName.textContent = currentExchangeCandidate.name || 'Foydalanuvchi';
+      }
+      if (exchangeUserUsername) {
+        exchangeUserUsername.textContent = currentExchangeCandidate.username
+          ? `@${currentExchangeCandidate.username}`
+          : '@username';
+      }
+      if (exchangeLinkUrl) {
+        exchangeLinkUrl.textContent = currentExchangeCandidate.botUrl || 'https://t.me/yourbot';
+      }
+    }
+
     exchangeCard.classList.add('exchange-card--visible');
   }
 
   // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
-    btnStartExchange.addEventListener('click', () => {
+    btnStartExchange.addEventListener('click', async () => {
       // Agar hozircha mos sherik bo'lmasa, foydalanuvchiga xabar chiqamiz
       if (!hasExchangeCandidates) {
         if (tg) {
@@ -777,10 +790,49 @@
         return;
       }
 
+      // Avval backenddan real kandidatni so'rab olamiz
+      if (!currentTelegramId) {
+        if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const c = data && data.candidate ? data.candidate : null;
+
+          if (!c) {
+            if (tg) {
+              tg.showAlert(
+                'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.'
+              );
+            }
+            return;
+          }
+
+          currentExchangeCandidate = {
+            telegramId: c.telegram_id,
+            name: c.name || 'Foydalanuvchi',
+            username: c.username || '',
+            profileLink: c.profile_link || '',
+            botUrl: c.main_link || '',
+            description: c.description || ''
+          };
+        } else {
+          if (tg) tg.showAlert('Kandidatni yuklashda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
+          return;
+        }
+      } catch (e) {
+        console.error('exchange/match fetch xato:', e);
+        if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+        return;
+      }
+
       // Botga almashishni boshlash haqida xabar yuboramiz (slot tanlash va haqiqiy kandidat uchun)
       sendStartExchange();
 
-      // Hero cardni yashiramiz, almashish kartasini esa statik ko'rinishda ko'rsatamiz
+      // Hero cardni yashiramiz, almashish kartasini esa real kandidat bilan ko'rsatamiz
       if (exchangeHeroCard) {
         exchangeHeroCard.style.display = 'none';
       }
