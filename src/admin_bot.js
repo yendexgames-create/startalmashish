@@ -5,9 +5,10 @@ import { db, getSetting, setSetting, getChannels, addOrUpdateChannel } from './d
 // Sizning admin Telegram ID'ingiz
 const ADMIN_ID = 7386008809;
 
+// Agar ADMIN_BOT_TOKEN bo'lmasa, admin botni ishga tushirmaymiz, lekin asosiy bot va server ishlashda davom etadi.
 if (!ADMIN_BOT_TOKEN) {
-  console.error('ADMIN_BOT_TOKEN .env faylida topilmadi');
-  process.exit(1);
+  console.warn('ADMIN_BOT_TOKEN .env faylida topilmadi, admin bot ishga tushirilmaydi');
+  return;
 }
 
 const adminBot = new Telegraf(ADMIN_BOT_TOKEN);
