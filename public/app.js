@@ -714,13 +714,21 @@
     }
   }
 
-  if (exchangeNextBtn) {
-    exchangeNextBtn.addEventListener('click', () => {
-      openCurrentBotLink();
-      // Keyinchalik bu yerda backenddan keyingi candidate ni so'rash mumkin bo'ladi
+  // "Bor" tugmasi – almashishga rozilik
+  if (exchangeYesBtn) {
+    exchangeYesBtn.addEventListener('click', () => {
+      sendExchangeAction('yes');
     });
   }
 
+  // "Keyingisi" tugmasi – keyingi sherikni so'rash
+  if (exchangeNextBtn) {
+    exchangeNextBtn.addEventListener('click', () => {
+      sendExchangeAction('next');
+    });
+  }
+
+  // Linkning o'zi bosilganda – bot linkini ochish
   if (exchangeLinkUrl) {
     exchangeLinkUrl.addEventListener('click', () => {
       openCurrentBotLink();

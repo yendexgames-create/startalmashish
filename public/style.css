@@ -250,8 +250,8 @@ body {
 }
 
 .exchange-user-avatar {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   background: linear-gradient(135deg, #7fa650, #8bc34a);
   display: flex;
@@ -326,8 +326,8 @@ body {
   gap: 6px;
 }
 
-.exchange-actions.single {
-  grid-template-columns: minmax(0, 1fr);
+.exchange-actions.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .exchange-btn.ghost {
