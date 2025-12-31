@@ -27,7 +27,7 @@
   const tileRefInfo = document.getElementById('tile-ref-info');
   const tileStatsInfo = document.getElementById('tile-stats-info');
 
-  // Splash va tutorial elementlari
+  // Tutorial elementlari
   const tutorialOverlay = document.getElementById('tutorial-overlay');
   const tutorialHighlight = document.getElementById('tutorial-highlight');
   const tutorialTooltip = document.getElementById('tutorial-tooltip');
@@ -37,6 +37,52 @@
 
   let currentTelegramId = null;
   let tutorialStep = 0;
+
+  // Tutorial overlay kamida ko'rinadigan bo'lsin (keyin JS orqali highlight joyiga qo'yiladi)
+  if (tutorialOverlay) {
+    tutorialOverlay.classList.remove('hidden');
+    tutorialOverlay.style.display = 'block';
+  }
+
+  // Tutorial qadamlar ro'yxati (maksimum 6 ta)
+  const tutorialSteps = [
+    {
+      // 1-qadam: Bosh sahifadagi "Almashish" tile
+      view: 'view-home',
+      selector: '.tile-exchange',
+      text: 'Bu kafel orqali almashish bo\'limiga o\'tasiz va almashishni WebApp ichida boshlasiz.'
+    },
+    {
+      // 2-qadam: Almashish bo\'limidagi asosiy tugma
+      view: 'view-exchange',
+      selector: '#btn-start-exchange',
+      text: 'Shu tugmani bossangiz, almashish jarayoni shu Web ilova orqali ishga tushadi va bot sizga sherik beradI.'
+    },
+    {
+      // 3-qadam: Bosh sahifadagi "Slotlar" tile
+      view: 'view-home',
+      selector: '.tile-slots',
+      text: 'Slotlar kafeli sizni profil/slotlar bo\'limiga olib o\'tadi va qaysi bot bilan almashayotganingizni ko\'rasiz.'
+    },
+    {
+      // 4-qadam: Profildagi slotlar kartasi
+      view: 'view-profile',
+      selector: '#slots-card',
+      text: 'Profil bo\'limida 1-slot linkingiz va tavsifini tahrir qilasiz. Almashish aynan shu link orqali bajariladi.'
+    },
+    {
+      // 5-qadam: Referal / Do\'st taklif qilish
+      view: 'view-friends',
+      selector: '#btn-share-ref',
+      text: 'Do\'stlaringizni referal orqali taklif qiling, shunda qo\'shimcha slotlar ochiladi.'
+    },
+    {
+      // 6-qadam: Bosh sahifadagi "Do\'stlar" tile
+      view: 'view-home',
+      selector: '.tile-friends',
+      text: 'Bu kafel orqali almashgan do\'stlaringiz ro\'yxatini ko\'rasiz.'
+    }
+  ];
 
   // --- Qor yog'ishi animatsiyasi (faqat qish oylarida) ---
   function initSnowIfSeason() {
@@ -100,6 +146,73 @@
     }
 
     animateSnow();
+  }
+
+  function endTutorial() {
+    if (tutorialOverlay) {
+      tutorialOverlay.classList.add('hidden');
+      tutorialOverlay.style.display = 'none';
+    }
+    window.localStorage.setItem('tutorial_done', '1');
+  }
+
+  function showTutorialStep() {
+    if (!tutorialOverlay || !tutorialHighlight || !tutorialText) return;
+
+    if (tutorialStep >= tutorialSteps.length) {
+      endTutorial();
+      return;
+    }
+
+    const step = tutorialSteps[tutorialStep];
+
+    // Kerakli viewga o'tamiz
+    if (step.view) {
+      switchView(step.view);
+    }
+
+    // View almashganidan keyin elementni topish uchun biroz kutamiz
+    setTimeout(() => {
+      const el = document.querySelector(step.selector);
+      if (!el) {
+        // Element topilmasa, keyingi qadamlarga o'tamiz
+        tutorialStep += 1;
+        showTutorialStep();
+        return;
+      }
+
+      const rect = el.getBoundingClientRect();
+
+      tutorialOverlay.style.display = 'block';
+      tutorialOverlay.classList.remove('hidden');
+
+      const padding = 8;
+      tutorialHighlight.style.top = `${rect.top + window.scrollY - padding}px`;
+      tutorialHighlight.style.left = `${rect.left + window.scrollX - padding}px`;
+      tutorialHighlight.style.width = `${rect.width + padding * 2}px`;
+      tutorialHighlight.style.height = `${rect.height + padding * 2}px`;
+
+      tutorialText.textContent = step.text;
+    }, 250);
+  }
+
+  function startTutorial() {
+    if (!tutorialOverlay) return;
+    tutorialStep = 0;
+    showTutorialStep();
+  }
+
+  if (tutorialNext) {
+    tutorialNext.addEventListener('click', () => {
+      tutorialStep += 1;
+      showTutorialStep();
+    });
+  }
+
+  if (tutorialSkip) {
+    tutorialSkip.addEventListener('click', () => {
+      endTutorial();
+    });
   }
 
   function switchView(targetId) {
@@ -246,15 +359,12 @@
           navbar.style.display = 'flex';
         }
         switchView('view-home');
-
-        // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
-        const tutorialDone = window.localStorage.getItem('tutorial_done');
-        if (tutorialDone !== '1') {
-          setTimeout(() => {
-            startTutorial();
-          }, 400);
-        }
       }
+
+      // Hozircha test uchun: backend muvaffaqiyatli yuklangach, tutorialni ishga tushiramiz
+      setTimeout(() => {
+        startTutorial();
+      }, 400);
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
       // Foydalanuvchiga eng kamida Telegram profili ko‘rinib tursin
