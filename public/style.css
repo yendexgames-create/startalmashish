@@ -227,9 +227,10 @@ body {
 
 /* Almashish kartasi (match card) */
 .exchange-card {
-  margin-top: 10px;
+  margin: 16px auto 0;
   padding: 12px 12px 10px;
   border-radius: 16px;
+  background: #262626;
   background: radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), #111827);
   border: 1px solid rgba(55, 65, 81, 0.8);
   box-shadow: 0 18px 32px rgba(0, 0, 0, 0.7);
@@ -307,8 +308,9 @@ body {
 
 .exchange-link-url {
   font-size: 0.78rem;
-  color: #9ca3af;
-  word-break: break-all;
+  color: #3498db;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .exchange-hint {
@@ -322,6 +324,10 @@ body {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+
+.exchange-actions.single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .exchange-btn.ghost {

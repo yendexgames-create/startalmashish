@@ -646,8 +646,11 @@
     const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
 
     if (exchangeUserAvatar) {
-      // Hozircha faqat bosh harfni ko'rsatamiz (Telegram rasmiga hozircha ehtiyoj yo'q)
-      exchangeUserAvatar.textContent = initial;
+      if (c.photoUrl) {
+        exchangeUserAvatar.innerHTML = `<img src="${c.photoUrl}" alt="avatar" />`;
+      } else {
+        exchangeUserAvatar.textContent = initial;
+      }
     }
     if (exchangeUserName) exchangeUserName.textContent = displayName;
     if (exchangeUserUsername) exchangeUserUsername.textContent = displayUsername;
@@ -697,21 +700,30 @@
     }
   }
 
-  if (exchangeYesBtn) {
-    exchangeYesBtn.addEventListener('click', () => {
-      sendExchangeAction('yes');
-    });
-  }
+  function openCurrentBotLink() {
+    if (!currentExchangeCandidate || !currentExchangeCandidate.botUrl) {
+      if (tg) tg.showAlert('Bot linki topilmadi. Avval 1-slot uchun link kiriting.');
+      return;
+    }
 
-  if (exchangeNoBtn) {
-    exchangeNoBtn.addEventListener('click', () => {
-      sendExchangeAction('no');
-    });
+    const url = currentExchangeCandidate.botUrl;
+    if (tg && typeof tg.openTelegramLink === 'function') {
+      tg.openTelegramLink(url);
+    } else {
+      window.open(url, '_blank');
+    }
   }
 
   if (exchangeNextBtn) {
     exchangeNextBtn.addEventListener('click', () => {
-      sendExchangeAction('next');
+      openCurrentBotLink();
+      // Keyinchalik bu yerda backenddan keyingi candidate ni so'rash mumkin bo'ladi
+    });
+  }
+
+  if (exchangeLinkUrl) {
+    exchangeLinkUrl.addEventListener('click', () => {
+      openCurrentBotLink();
     });
   }
 
