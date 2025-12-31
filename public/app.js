@@ -312,6 +312,19 @@
       const activeSlots = links.filter((l) => l.link).length;
       const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
 
+      // Almashish kartasi uchun hozircha foydalanuvchining o'z profilini candidate sifatida saqlab qo'yamiz
+      const slot1 = links.find((l) => l.slot_index === 1 && l.link);
+      const mainBotLink = slot1?.link || meData.user.main_link || '';
+      const mainBotDesc = slot1?.description || meData.user.description || 'Sizning asosiy bot/linkingiz';
+
+      currentExchangeCandidate = {
+        name: meData.user.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Foydalanuvchi',
+        username: meData.user.username || u.username || '',
+        photoUrl: u.photo_url || '',
+        botTitle: mainBotDesc,
+        botUrl: mainBotLink
+      };
+
       // Asosiy bo'limlarni chizish
       renderProfile(meData.user, u, { activeSlots, totalSlots });
       renderSlots(slotsData || null);
@@ -651,24 +664,20 @@
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
       if (exchangeCard && currentExchangeCandidate) {
+        // Hero cardni yashiramiz, faqat match kartasi ko'rinadi
+        if (exchangeHeroCard) {
+          exchangeHeroCard.style.display = 'none';
+        }
+
         fillExchangeCardFromCandidate();
-        // WebApp ichida kartani ko'rsatamiz, bot bilan aloqa "Bor/Yo'q/Keyingisi"da bo'ladi
         return;
       }
 
-      // Agar kartani chizib bo'lmasa, eski xulq-atvorga qaytamiz
+      // Candidate tayyor bo'lmasa ham WebAppni yopmaymiz, faqat xabar ko'rsatamiz
       if (tg) {
-        try {
-          tg.sendData(
-            JSON.stringify({
-              type: 'start_exchange'
-            })
-          );
-          tg.close();
-        } catch (e) {
-          console.error('sendData xato:', e);
-          tg.showAlert('Almashishni boshlashda xatolik. Iltimos, botdagi "🔁 Almashishni topish" tugmasidan foydalaning.');
-        }
+        tg.showAlert(
+          'Avval 1-slot uchun asosiy bot/linkni to‘ldiring. Shundan keyin almashish kartasi bu yerda ko‘rinadi.'
+        );
       }
     });
   }
