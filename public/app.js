@@ -37,6 +37,7 @@
   const exchangeLinkIcon = document.getElementById('exchange-link-icon');
   const exchangeLinkTitle = document.getElementById('exchange-link-title');
   const exchangeLinkUrl = document.getElementById('exchange-link-url');
+  const exchangeOpenBotBtn = document.getElementById('exchange-open-bot');
   const exchangeYesBtn = document.getElementById('exchange-yes');
   const exchangeNoBtn = document.getElementById('exchange-no');
   const exchangeNextBtn = document.getElementById('exchange-next');
@@ -728,9 +729,15 @@
     });
   }
 
-  // Linkning o'zi bosilganda – bot linkini ochish
+  // Linkning o'zi yoki "Botni ko‘rish" bosilganda – bot linkini ochish
   if (exchangeLinkUrl) {
     exchangeLinkUrl.addEventListener('click', () => {
+      openCurrentBotLink();
+    });
+  }
+
+  if (exchangeOpenBotBtn) {
+    exchangeOpenBotBtn.addEventListener('click', () => {
       openCurrentBotLink();
     });
   }

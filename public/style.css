@@ -250,8 +250,8 @@ body {
 }
 
 .exchange-user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: linear-gradient(135deg, #7fa650, #8bc34a);
   display: flex;
@@ -311,6 +311,18 @@ body {
   color: #3498db;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.link-button {
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
 }
 
 .exchange-hint {
