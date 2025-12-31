@@ -153,6 +153,14 @@
   let currentExchangeCandidate = null;
   let hasExchangeCandidates = false;
 
+  function getTutorialStorageKey() {
+    const base = 'tutorial_done';
+    if (currentTelegramId) {
+      return `${base}_${currentTelegramId}`;
+    }
+    return base;
+  }
+
   // Tutorial qadamlar ro'yxati (maksimum 6 ta)
   const tutorialSteps = [
     {
@@ -262,7 +270,8 @@
       tutorialOverlay.classList.add('hidden');
       tutorialOverlay.style.display = 'none';
     }
-    window.localStorage.setItem('tutorial_done', '1');
+    const key = getTutorialStorageKey();
+    window.localStorage.setItem(key, '1');
   }
 
   function showTutorialStep() {
@@ -307,7 +316,8 @@
 
   function startTutorial() {
     if (!tutorialOverlay) return;
-    const done = window.localStorage.getItem('tutorial_done');
+    const key = getTutorialStorageKey();
+    const done = window.localStorage.getItem(key);
     if (done === '1') return;
     tutorialStep = 0;
     showTutorialStep();
@@ -492,7 +502,8 @@
         switchView('view-home');
 
         // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
-        const tutorialDone = window.localStorage.getItem('tutorial_done');
+        const tutorialKey = getTutorialStorageKey();
+        const tutorialDone = window.localStorage.getItem(tutorialKey);
         if (tutorialDone !== '1') {
           setTimeout(() => {
             startTutorial();
