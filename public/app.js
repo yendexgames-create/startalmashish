@@ -860,10 +860,15 @@
   function sendExchangeAction(action) {
     if (!tg) return;
     try {
+      const candidateId = currentExchangeCandidate && currentExchangeCandidate.telegramId
+        ? currentExchangeCandidate.telegramId
+        : null;
+
       tg.sendData(
         JSON.stringify({
           type: 'exchange_action',
-          action
+          action,
+          candidate_id: candidateId
         })
       );
     } catch (e) {

@@ -1173,6 +1173,7 @@ bot.on('web_app_data', async (ctx) => {
   // 2) WebApp ichidagi "Bor" / "Keyingisi" tugmalari
   if (payload.type === 'exchange_action') {
     const action = payload.action;
+    const payloadCandidateId = payload.candidate_id || null;
 
     if (action === 'next') {
       // match_no bilan bir xil mantiq
@@ -1212,7 +1213,7 @@ bot.on('web_app_data', async (ctx) => {
         return;
       }
 
-      const candidateTelegramId = currentCandidates.get(telegramId);
+      const candidateTelegramId = payloadCandidateId || currentCandidates.get(telegramId);
       if (!candidateTelegramId) {
         await ctx.reply('Hozircha tanlangan link topilmadi, qaytadan urinib ko‘ring.');
         return;
