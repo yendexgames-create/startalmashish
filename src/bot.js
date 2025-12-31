@@ -246,7 +246,6 @@ function getRandomCandidateForUser(telegramId, excludeIds = []) {
     db.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId], (err, currentUser) => {
       if (err) return reject(err);
 
-      const currentBot = extractBotNameFromLink(currentUser && currentUser.main_link);
       const currentMainLink = currentUser && currentUser.main_link ? currentUser.main_link.trim() : null;
 
       db.all(
@@ -263,10 +262,6 @@ function getRandomCandidateForUser(telegramId, excludeIds = []) {
 
             // Bir xil user bo'lmasligi (zaxira tekshiruv)
             if (row.telegram_id === telegramId) return false;
-
-            const botName = extractBotNameFromLink(row.main_link);
-            // Bir xil bot nomi bo'lmasin
-            if (currentBot && botName && currentBot === botName) return false;
 
             // Asosiy linki ham aynan bir xil bo'lmasin
             if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
