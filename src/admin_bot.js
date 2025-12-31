@@ -5,34 +5,31 @@ import { db, getSetting, setSetting, getChannels, addOrUpdateChannel } from './d
 // Sizning admin Telegram ID'ingiz
 const ADMIN_ID = 7386008809;
 
-// Agar ADMIN_BOT_TOKEN bo'lmasa, admin botni ishga tushirmaymiz, lekin asosiy bot va server ishlashda davom etadi.
 if (!ADMIN_BOT_TOKEN) {
   console.warn('ADMIN_BOT_TOKEN .env faylida topilmadi, admin bot ishga tushirilmaydi');
-  return;
-}
+} else {
+  const adminBot = new Telegraf(ADMIN_BOT_TOKEN);
+  const adminStates = new Map(); // faqat admin uchun oddiy state
 
-const adminBot = new Telegraf(ADMIN_BOT_TOKEN);
-const adminStates = new Map(); // faqat admin uchun oddiy state
-
-function adminMainKeyboard() {
-  return Markup.keyboard([
-    ['📊 Obunalar', '➕ Kanal qo‘shish'],
-    ['❌ Kanalni olib tashlash'],
-    ['🧹 Foydalanuvchilarni o‘chirish'],
-    ['🚫 Bloklanganlar ro‘yxati']
-  ]).resize();
-}
-
-adminBot.start((ctx) => {
-  if (ctx.from.id !== ADMIN_ID) {
-    return ctx.reply('Bu bot faqat admin uchun mo‘ljallangan.');
+  function adminMainKeyboard() {
+    return Markup.keyboard([
+      ['📊 Obunalar', '➕ Kanal qo‘shish'],
+      ['❌ Kanalni olib tashlash'],
+      ['🧹 Foydalanuvchilarni o‘chirish'],
+      ['🚫 Bloklanganlar ro‘yxati']
+    ]).resize();
   }
 
-  return ctx.reply('👨‍💻 Admin panelga xush kelibsiz.', adminMainKeyboard());
-});
+  adminBot.start((ctx) => {
+    if (ctx.from.id !== ADMIN_ID) {
+      return ctx.reply('Bu bot faqat admin uchun mo‘ljallangan.');
+    }
 
-// Asosiy admin text handler
-adminBot.on('text', async (ctx) => {
+    return ctx.reply('👨‍💻 Admin panelga xush kelibsiz.', adminMainKeyboard());
+  });
+
+  // Asosiy admin text handler
+  adminBot.on('text', async (ctx) => {
   const fromId = ctx.from.id;
   const text = ctx.message.text;
 
@@ -287,10 +284,10 @@ adminBot.on('text', async (ctx) => {
     console.error('Admin xabariga yuborishda xato:', e);
     await ctx.reply('Xatolik yuz berdi, keyinroq urinib ko‘ring.');
   }
-});
+  });
 
-// Blokni bekor qilish uchun inline handler
-adminBot.action(/unblock_(\d+)/, async (ctx) => {
+  // Blokni bekor qilish uchun inline handler
+  adminBot.action(/unblock_(\d+)/, async (ctx) => {
   const telegramId = parseInt(ctx.match[1], 10);
 
   db.run(
@@ -307,10 +304,10 @@ adminBot.action(/unblock_(\d+)/, async (ctx) => {
       await ctx.editMessageReplyMarkup();
     }
   );
-});
+  });
 
-// Kanallar ro'yxatidan bitta kanalni o'chirish
-adminBot.action(/delchan_(\d+)/, async (ctx) => {
+  // Kanallar ro'yxatidan bitta kanalni o'chirish
+  adminBot.action(/delchan_(\d+)/, async (ctx) => {
   const channelId = parseInt(ctx.match[1], 10);
 
   db.serialize(() => {
@@ -325,10 +322,10 @@ adminBot.action(/delchan_(\d+)/, async (ctx) => {
   } catch (e) {
     // ignore
   }
-});
+  });
 
-// Bitta foydalanuvchini va unga tegishli barcha ma'lumotlarni o'chirish
-adminBot.action(/deluser_(\d+)/, async (ctx) => {
+  // Bitta foydalanuvchini va unga tegishli barcha ma'lumotlarni o'chirish
+  adminBot.action(/deluser_(\d+)/, async (ctx) => {
   const telegramId = parseInt(ctx.match[1], 10);
 
   db.serialize(() => {
@@ -367,34 +364,37 @@ adminBot.action(/deluser_(\d+)/, async (ctx) => {
   } catch (e) {
     // ignore
   }
-});
-
-adminBot.launch()
-  .then(() => {
-    console.log('Admin bot ishga tushdi');
-  })
-  .catch((err) => {
-    console.error('Admin botni ishga tushirishda xato (getMe yoki tarmoq):', err);
   });
 
-process.once('SIGINT', () => adminBot.stop('SIGINT'));
-process.once('SIGTERM', () => adminBot.stop('SIGTERM'));
+  adminBot.launch()
+    .then(() => {
+      console.log('Admin bot ishga tushdi');
+    })
+    .catch((err) => {
+      console.error('Admin botni ishga tushirishda xato (getMe yoki tarmoq):', err);
+    });
 
-// Global Telegraf xatolarini ushlash
-adminBot.catch((err, ctx) => {
-  console.error('Admin botda xatolik yuz berdi:', err);
-  try {
-    ctx.reply('Admin botda kutilmagan xatolik yuz berdi. Iltimos, birozdan so‘ng qayta urinib ko‘ring.').catch(() => {});
-  } catch (e) {
-    // ignore
-  }
-});
+  process.once('SIGINT', () => adminBot.stop('SIGINT'));
+  process.once('SIGTERM', () => adminBot.stop('SIGTERM'));
 
-// Node jarayonidagi global xatolarni ushlash
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection (admin):', reason);
-});
+  // Global Telegraf xatolarini ushlash
+  adminBot.catch((err, ctx) => {
+    console.error('Admin botda xatolik yuz berdi:', err);
+    try {
+      ctx
+        .reply('Admin botda kutilmagan xatolik yuz berdi. Iltimos, birozdan so‘ng qayta urinib ko‘ring.')
+        .catch(() => {});
+    } catch (e) {
+      // ignore
+    }
+  });
 
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception (admin):', err);
-});
+  // Node jarayonidagi global xatolarni ushlash
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection (admin):', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception (admin):', err);
+  });
+}
