@@ -115,7 +115,10 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// Foydalanuvchi uchun hozircha mos almashish kandidati bormi-yo'qligini tekshirish
+// Foydalanuvchi uchun hozircha boshqa foydalanuvchilar bormi-yo'qligini tekshirish (soddalashtirilgan)
+// Asl murakkab filtrlar (o'zi bilan tenglashtirmaslik, bir xil bot/linkni chetga olish) bot ichidagi
+// getRandomCandidateForUser funksiyasida ishlaydi. Bu yerda faqat "umuman olganda" sherik bo'lishi
+// mumkin bo'lgan boshqa user bor-yo'qligini ko'ramiz.
 app.get('/api/exchange/has_candidates', async (req, res) => {
   try {
     const telegramId = parseInt(req.query.telegram_id, 10);
@@ -124,15 +127,12 @@ app.get('/api/exchange/has_candidates', async (req, res) => {
     }
 
     const user = await findUserByTelegramId(telegramId);
-    if (!user || !user.main_link) {
+    if (!user) {
       return res.json({ has_candidates: false });
     }
 
-    const currentBot = extractBotNameFromLink(user.main_link);
-    const currentMainLink = user.main_link ? user.main_link.trim() : null;
-
     db.all(
-      'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
+      'SELECT telegram_id, main_link FROM users WHERE telegram_id != ? AND main_link IS NOT NULL LIMIT 1',
       [telegramId],
       (err, rows) => {
         if (err) {
@@ -144,18 +144,7 @@ app.get('/api/exchange/has_candidates', async (req, res) => {
           return res.json({ has_candidates: false });
         }
 
-        const hasAny = rows.some((row) => {
-          if (row.telegram_id === telegramId) return false;
-
-          const botName = extractBotNameFromLink(row.main_link);
-          if (currentBot && botName && currentBot === botName) return false;
-
-          if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
-
-          return true;
-        });
-
-        return res.json({ has_candidates: hasAny });
+        return res.json({ has_candidates: true });
       }
     );
   } catch (e) {
