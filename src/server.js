@@ -37,6 +37,18 @@ function findUserByTelegramId(telegramId) {
   });
 }
 
+function extractBotNameFromLink(link) {
+  if (!link) return null;
+  try {
+    const url = new URL(link);
+    if (!url.hostname.includes('t.me')) return null;
+    const p = url.pathname.replace(/^\//, '');
+    return p.split('/')[0] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function getUserLinksAll(telegramId) {
   return new Promise((resolve, reject) => {
     db.all(
@@ -99,6 +111,55 @@ app.get('/api/me', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/me xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Foydalanuvchi uchun hozircha mos almashish kandidati bormi-yo'qligini tekshirish
+app.get('/api/exchange/has_candidates', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user || !user.main_link) {
+      return res.json({ has_candidates: false });
+    }
+
+    const currentBot = extractBotNameFromLink(user.main_link);
+    const currentMainLink = user.main_link ? user.main_link.trim() : null;
+
+    db.all(
+      'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
+      [telegramId],
+      (err, rows) => {
+        if (err) {
+          console.error('/api/exchange/has_candidates query xato:', err);
+          return res.status(500).json({ error: 'Server xatosi' });
+        }
+
+        if (!rows || rows.length === 0) {
+          return res.json({ has_candidates: false });
+        }
+
+        const hasAny = rows.some((row) => {
+          if (row.telegram_id === telegramId) return false;
+
+          const botName = extractBotNameFromLink(row.main_link);
+          if (currentBot && botName && currentBot === botName) return false;
+
+          if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
+
+          return true;
+        });
+
+        return res.json({ has_candidates: hasAny });
+      }
+    );
+  } catch (e) {
+    console.error('/api/exchange/has_candidates xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });

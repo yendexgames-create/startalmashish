@@ -151,6 +151,7 @@
   let currentTelegramId = null;
   let tutorialStep = 0;
   let currentExchangeCandidate = null;
+  let hasExchangeCandidates = false;
 
   // Tutorial qadamlar ro'yxati (maksimum 6 ta)
   const tutorialSteps = [
@@ -411,8 +412,21 @@
       const activeSlots = links.filter((l) => l.link).length;
       const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
 
-      // WebApp dagi almashish kartasi hozircha real sherikni emas, faqat umumiy interfeysni ko'rsatadi,
-      // shuning uchun currentExchangeCandidate ni foydalanuvchining o'zi bilan to'ldirmaymiz.
+      // Almashish uchun hozircha mos sherik bormi-yo'qligini backenddan so'rab olamiz
+      try {
+        const hasRes = await fetch(`/api/exchange/has_candidates?telegram_id=${telegramId}`);
+        if (hasRes.ok) {
+          const hasData = await hasRes.json();
+          hasExchangeCandidates = !!hasData.has_candidates;
+        } else {
+          hasExchangeCandidates = false;
+        }
+      } catch (e) {
+        console.error('has_candidates fetch xato:', e);
+        hasExchangeCandidates = false;
+      }
+
+      // WebApp dagi almashish kartasi hozircha real sherikni emas, faqat umumiy interfeysni ko'rsatadi.
       currentExchangeCandidate = null;
 
       // Asosiy bo'limlarni chizish
@@ -751,6 +765,18 @@
   // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
+      // Agar hozircha mos sherik bo'lmasa, foydalanuvchiga xabar chiqamiz
+      if (!hasExchangeCandidates) {
+        if (tg) {
+          tg.showAlert(
+            'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.'
+          );
+        } else {
+          alert('Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.');
+        }
+        return;
+      }
+
       // Botga almashishni boshlash haqida xabar yuboramiz (slot tanlash va haqiqiy kandidat uchun)
       sendStartExchange();
 
