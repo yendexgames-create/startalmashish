@@ -51,12 +51,6 @@
   let tutorialStep = 0;
   let currentExchangeCandidate = null;
 
-  // Tutorial overlay kamida ko'rinadigan bo'lsin (keyin JS orqali highlight joyiga qo'yiladi)
-  if (tutorialOverlay) {
-    tutorialOverlay.classList.remove('hidden');
-    tutorialOverlay.style.display = 'block';
-  }
-
   // Tutorial qadamlar ro'yxati (maksimum 6 ta)
   const tutorialSteps = [
     {
@@ -211,6 +205,8 @@
 
   function startTutorial() {
     if (!tutorialOverlay) return;
+    const done = window.localStorage.getItem('tutorial_done');
+    if (done === '1') return;
     tutorialStep = 0;
     showTutorialStep();
   }
@@ -310,29 +306,6 @@
       const slotsData = slotsRes.ok ? await slotsRes.json() : null;
       const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
 
-      const links = slotsData && Array.isArray(slotsData.links) ? slotsData.links : [];
-      const activeSlots = links.filter((l) => l.link).length;
-      const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
-
-      // Asosiy bo'limlarni chizish
-      renderProfile(meData.user, u, { activeSlots, totalSlots });
-      renderSlots(slotsData || null);
-      renderFriends(friendsData.friends || []);
-
-      // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
-      if (homeUsername) {
-        homeUsername.textContent = meData.user.username
-          ? '@' + meData.user.username
-          : u.username
-          ? '@' + u.username
-          : 'Foydalanuvchi';
-      }
-      if (homeSlotsShort) {
-        homeSlotsShort.textContent = `Slotlar: ${activeSlots}/${totalSlots}`;
-      }
-      if (tileSlotsInfo) {
-        tileSlotsInfo.textContent = `${activeSlots} / ${totalSlots} ochiq`;
-      }
       if (tileFriendsInfo) {
         const friendsCount = (friendsData.friends && friendsData.friends.length) || 0;
         tileFriendsInfo.textContent = `${friendsCount} ta`;
@@ -372,12 +345,15 @@
           navbar.style.display = 'flex';
         }
         switchView('view-home');
-      }
 
-      // Hozircha test uchun: backend muvaffaqiyatli yuklangach, tutorialni ishga tushiramiz
-      setTimeout(() => {
-        startTutorial();
-      }, 400);
+        // Tutorial faqat birinchi marta va 1-slot tayyor bo'lganda ko'rsatiladi
+        const tutorialDone = window.localStorage.getItem('tutorial_done');
+        if (tutorialDone !== '1') {
+          setTimeout(() => {
+            startTutorial();
+          }, 400);
+        }
+      }
     } catch (e) {
       console.error('Backend yuklashda xato:', e);
       // Foydalanuvchiga eng kamida Telegram profili ko‘rinib tursin
@@ -681,7 +657,6 @@
           action
         })
       );
-      tg.close();
     } catch (e) {
       console.error('exchange_action sendData xato:', e);
       tg.showAlert('Almashish javobini yuborishda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
