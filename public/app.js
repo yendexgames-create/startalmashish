@@ -27,6 +27,18 @@
   const tileRefInfo = document.getElementById('tile-ref-info');
   const tileStatsInfo = document.getElementById('tile-stats-info');
 
+  // Almashish kartasi elementlari
+  const exchangeCard = document.getElementById('exchange-card');
+  const exchangeUserAvatar = document.getElementById('exchange-user-avatar');
+  const exchangeUserName = document.getElementById('exchange-user-name');
+  const exchangeUserUsername = document.getElementById('exchange-user-username');
+  const exchangeLinkIcon = document.getElementById('exchange-link-icon');
+  const exchangeLinkTitle = document.getElementById('exchange-link-title');
+  const exchangeLinkUrl = document.getElementById('exchange-link-url');
+  const exchangeYesBtn = document.getElementById('exchange-yes');
+  const exchangeNoBtn = document.getElementById('exchange-no');
+  const exchangeNextBtn = document.getElementById('exchange-next');
+
   // Tutorial elementlari
   const tutorialOverlay = document.getElementById('tutorial-overlay');
   const tutorialHighlight = document.getElementById('tutorial-highlight');
@@ -37,6 +49,7 @@
 
   let currentTelegramId = null;
   let tutorialStep = 0;
+  let currentExchangeCandidate = null;
 
   // Tutorial overlay kamida ko'rinadigan bo'lsin (keyin JS orqali highlight joyiga qo'yiladi)
   if (tutorialOverlay) {
@@ -607,9 +620,42 @@
     friendsDiv.innerHTML = `<ul class="friends-list">${items.join('')}</ul>`;
   }
 
-  // --- Tugmalar uchun oddiy handlerlar ---
+  // --- Almashish kartasi logikasi ---
+  function fillExchangeCardFromCandidate() {
+    if (!exchangeCard || !currentExchangeCandidate) return;
+
+    const c = currentExchangeCandidate;
+
+    // Foydalanuvchi ma'lumotlari
+    const displayName = c.name || 'Foydalanuvchi';
+    const displayUsername = c.username ? '@' + c.username : '';
+    const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
+
+    if (exchangeUserAvatar) {
+      // Hozircha faqat bosh harfni ko'rsatamiz (Telegram rasmiga hozircha ehtiyoj yo'q)
+      exchangeUserAvatar.textContent = initial;
+    }
+    if (exchangeUserName) exchangeUserName.textContent = displayName;
+    if (exchangeUserUsername) exchangeUserUsername.textContent = displayUsername;
+
+    // Bot / link ma'lumotlari
+    if (exchangeLinkTitle) exchangeLinkTitle.textContent = c.botTitle || 'Sizning asosiy botingiz';
+    if (exchangeLinkUrl) exchangeLinkUrl.textContent = c.botUrl || 'Link kiritilmagan';
+    if (exchangeLinkIcon) exchangeLinkIcon.textContent = '🤖';
+
+    exchangeCard.classList.add('exchange-card--visible');
+  }
+
+  // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
+      if (exchangeCard && currentExchangeCandidate) {
+        fillExchangeCardFromCandidate();
+        // WebApp ichida kartani ko'rsatamiz, bot bilan aloqa "Bor/Yo'q/Keyingisi"da bo'ladi
+        return;
+      }
+
+      // Agar kartani chizib bo'lmasa, eski xulq-atvorga qaytamiz
       if (tg) {
         try {
           tg.sendData(
@@ -623,6 +669,40 @@
           tg.showAlert('Almashishni boshlashda xatolik. Iltimos, botdagi "🔁 Almashishni topish" tugmasidan foydalaning.');
         }
       }
+    });
+  }
+
+  function sendExchangeAction(action) {
+    if (!tg) return;
+    try {
+      tg.sendData(
+        JSON.stringify({
+          type: 'exchange_action',
+          action
+        })
+      );
+      tg.close();
+    } catch (e) {
+      console.error('exchange_action sendData xato:', e);
+      tg.showAlert('Almashish javobini yuborishda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
+    }
+  }
+
+  if (exchangeYesBtn) {
+    exchangeYesBtn.addEventListener('click', () => {
+      sendExchangeAction('yes');
+    });
+  }
+
+  if (exchangeNoBtn) {
+    exchangeNoBtn.addEventListener('click', () => {
+      sendExchangeAction('no');
+    });
+  }
+
+  if (exchangeNextBtn) {
+    exchangeNextBtn.addEventListener('click', () => {
+      sendExchangeAction('next');
     });
   }
 

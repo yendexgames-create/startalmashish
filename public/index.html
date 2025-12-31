@@ -92,7 +92,35 @@
             <p class="hero-text">
               Bu bo'limda siz slotlaringizdan qaysi biri bilan almashishni boshlashni tanlaysiz.
             </p>
-            <button id="btn-start-exchange" class="primary-btn">Almashishni boshlash</button>
+            <button id="btn-start-exchange" class="primary-btn">Almashishni topish</button>
+          </div>
+
+          <div id="exchange-card" class="exchange-card">
+            <div class="exchange-user">
+              <div class="exchange-user-avatar" id="exchange-user-avatar">U</div>
+              <div class="exchange-user-main">
+                <div class="exchange-user-name" id="exchange-user-name">Foydalanuvchi nomi</div>
+                <div class="exchange-user-username" id="exchange-user-username">@username</div>
+              </div>
+            </div>
+
+            <div class="exchange-link-preview">
+              <div class="exchange-link-icon" id="exchange-link-icon">🤖</div>
+              <div class="exchange-link-main">
+                <div class="exchange-link-title" id="exchange-link-title">Bot nomi</div>
+                <div class="exchange-link-url" id="exchange-link-url">https://t.me/yourbot</div>
+              </div>
+            </div>
+
+            <p class="exchange-hint">
+              Agar "Bor" desangiz, almashish shu bot orqali davom etadi. "Yo'q" yoki "Keyingisi" orqali boshqa sheriklarni ko'rishingiz mumkin.
+            </p>
+
+            <div class="exchange-actions">
+              <button id="exchange-no" class="secondary-btn exchange-btn">Yo'q</button>
+              <button id="exchange-next" class="secondary-btn exchange-btn ghost">Keyingisi</button>
+              <button id="exchange-yes" class="primary-btn exchange-btn">Bor</button>
+            </div>
           </div>
         </section>
 
