@@ -411,18 +411,9 @@
       const activeSlots = links.filter((l) => l.link).length;
       const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
 
-      // Almashish kartasi uchun hozircha foydalanuvchining o'z profilini candidate sifatida saqlab qo'yamiz
-      const slot1 = links.find((l) => l.slot_index === 1 && l.link);
-      const mainBotLink = slot1?.link || meData.user.main_link || '';
-      const mainBotDesc = slot1?.description || meData.user.description || 'Sizning asosiy bot/linkingiz';
-
-      currentExchangeCandidate = {
-        name: meData.user.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Foydalanuvchi',
-        username: meData.user.username || u.username || '',
-        photoUrl: u.photo_url || '',
-        botTitle: mainBotDesc,
-        botUrl: mainBotLink
-      };
+      // WebApp dagi almashish kartasi hozircha real sherikni emas, faqat umumiy interfeysni ko'rsatadi,
+      // shuning uchun currentExchangeCandidate ni foydalanuvchining o'zi bilan to'ldirmaymiz.
+      currentExchangeCandidate = null;
 
       // Asosiy bo'limlarni chizish
       renderProfile(meData.user, u, { activeSlots, totalSlots });
@@ -737,53 +728,38 @@
   }
 
   // --- Almashish kartasi logikasi ---
-  function fillExchangeCardFromCandidate() {
-    if (!exchangeCard || !currentExchangeCandidate) return;
-
-    const c = currentExchangeCandidate;
-
-    // Foydalanuvchi ma'lumotlari
-    const displayName = c.name || 'Foydalanuvchi';
-    const displayUsername = c.username ? '@' + c.username : '';
-    const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
-
-    if (exchangeUserAvatar) {
-      if (c.photoUrl) {
-        exchangeUserAvatar.innerHTML = `<img src="${c.photoUrl}" alt="avatar" />`;
-      } else {
-        exchangeUserAvatar.textContent = initial;
-      }
+  function sendStartExchange() {
+    if (!tg || !tg.sendData) return;
+    try {
+      tg.sendData(
+        JSON.stringify({
+          type: 'start_exchange'
+        })
+      );
+    } catch (e) {
+      console.error('start_exchange sendData xato:', e);
     }
-    if (exchangeUserName) exchangeUserName.textContent = displayName;
-    if (exchangeUserUsername) exchangeUserUsername.textContent = displayUsername;
+  }
+  function fillExchangeCardFromCandidate() {
+    if (!exchangeCard) return;
 
-    // Bot / link ma'lumotlari
-    if (exchangeLinkTitle) exchangeLinkTitle.textContent = c.botTitle || 'Sizning asosiy botingiz';
-    if (exchangeLinkUrl) exchangeLinkUrl.textContent = c.botUrl || 'Link kiritilmagan';
-    if (exchangeLinkIcon) exchangeLinkIcon.textContent = '🤖';
-
+    // Hozircha WebApp ichida real sherik ma'lumotlarini emas, faqat umumiy almashish kartasini ko'rsatamiz.
+    // HTML ichidagi default matnlar (Foydalanuvchi nomi, Bot nomi va h.k.) saqlanib qoladi.
     exchangeCard.classList.add('exchange-card--visible');
   }
 
   // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', () => {
-      if (exchangeCard && currentExchangeCandidate) {
-        // Hero cardni yashiramiz, faqat match kartasi ko'rinadi
-        if (exchangeHeroCard) {
-          exchangeHeroCard.style.display = 'none';
-        }
+      // Botga almashishni boshlash haqida xabar yuboramiz (slot tanlash va haqiqiy kandidat uchun)
+      sendStartExchange();
 
-        fillExchangeCardFromCandidate();
-        return;
+      // Hero cardni yashiramiz, almashish kartasini esa statik ko'rinishda ko'rsatamiz
+      if (exchangeHeroCard) {
+        exchangeHeroCard.style.display = 'none';
       }
 
-      // Candidate tayyor bo'lmasa ham WebAppni yopmaymiz, faqat xabar ko'rsatamiz
-      if (tg) {
-        tg.showAlert(
-          'Avval 1-slot uchun asosiy bot/linkni to‘ldiring. Shundan keyin almashish kartasi bu yerda ko‘rinadi.'
-        );
-      }
+      fillExchangeCardFromCandidate();
     });
   }
 
