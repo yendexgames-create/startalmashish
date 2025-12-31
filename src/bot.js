@@ -1215,8 +1215,15 @@ bot.on('web_app_data', async (ctx) => {
 
       const candidateTelegramId = payloadCandidateId || currentCandidates.get(telegramId);
       if (!candidateTelegramId) {
-        await ctx.reply('Hozircha tanlangan link topilmadi, qaytadan urinib ko‘ring.');
+        await ctx.reply('Hozircha tanlangan link topilmadi, qaytadan urinib ko‘ring. (candidate_id topilmadi)');
         return;
+      }
+
+      // Debug: foydalanuvchiga qaysi kandidat tanlangani haqida qisqa xabar
+      try {
+        await ctx.reply(`Debug: WebApp dan yes olindi. candidate_id = ${candidateTelegramId}`);
+      } catch (e) {
+        // ignore
       }
       const candidate = await findUserByTelegramId(candidateTelegramId);
       if (!candidate || !candidate.main_link) {
