@@ -1252,11 +1252,7 @@ bot.on('web_app_data', async (ctx) => {
       }
 
       const candidateText =
-        `Kimdir siz bilan start almashmoqchi:
-
-Ism: ${uName}
-Username: ${uUsername}
-Profil: ${uProfile}
+        `Kimdir siz bilan start almashmoqchi.
 
 Sizning quyidagi linkingiz uchun:
 ${uLink}
@@ -1266,16 +1262,7 @@ Agar xohlasangiz, bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochib,
 
 Rozimisiz?`;
 
-      await bot.telegram.sendMessage(
-        candidateTelegramId,
-        candidateText,
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback('✅ Ha', `ex_accept_${exchangeId}`),
-            Markup.button.callback('❌ Yo‘q', `ex_reject_${exchangeId}`)
-          ]
-        ])
-      );
+      await bot.telegram.sendMessage(candidateTelegramId, candidateText);
       return;
     }
   }
@@ -1671,16 +1658,7 @@ ${uLink}
 
 Rozimisiz?`;
 
-  await bot.telegram.sendMessage(
-    candidateTelegramId,
-    candidateText,
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback('✅ Ha', `ex_accept_${exchangeId}`),
-        Markup.button.callback('❌ Yo‘q', `ex_reject_${exchangeId}`)
-      ]
-    ])
-  );
+  await bot.telegram.sendMessage(candidateTelegramId, candidateText);
 });
 
 bot.action(/ex_accept_(\d+)/, async (ctx) => {
