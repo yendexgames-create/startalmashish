@@ -351,8 +351,14 @@ if (!ADMIN_BOT_TOKEN) {
           db.run(`DELETE FROM exchanges WHERE id IN (${placeholders})`, exIds);
         }
 
+        // Foydalanuvchining barcha do'stliklari va referallarini o'chiramiz
         db.run('DELETE FROM friendships WHERE user_id = ? OR friend_id = ?', [telegramId, telegramId]);
         db.run('DELETE FROM referrals WHERE referrer_id = ? OR new_user_id = ?', [telegramId, telegramId]);
+
+        // WebApp slotlari va tavsiflari (user_links) ni ham o'chiramiz, aks holda WebApp eski ma'lumotni ko'rsatib qoladi
+        db.run('DELETE FROM user_links WHERE telegram_id = ?', [telegramId]);
+
+        // Oxirida users jadvalidagi o'zi o'chiriladi
         db.run('DELETE FROM users WHERE telegram_id = ?', [telegramId]);
       }
     );
