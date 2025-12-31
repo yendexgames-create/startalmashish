@@ -74,6 +74,21 @@ if (!ADMIN_BOT_TOKEN) {
       return;
     }
 
+    // /reset_all – faqat test uchun: barcha foydalanuvchilar va ularga tegishli ma'lumotlarni o'chirish
+    if (text === '/reset_all') {
+      db.serialize(() => {
+        db.run('DELETE FROM exchange_screenshots');
+        db.run('DELETE FROM exchanges');
+        db.run('DELETE FROM friendships');
+        db.run('DELETE FROM referrals');
+        db.run('DELETE FROM user_links');
+        db.run('DELETE FROM users');
+      });
+
+      await ctx.reply('⚠️ Barcha foydalanuvchilar va ularga tegishli almashish/slot maʼlumotlari o‘chirildi. Test uchun toza holatga qaytdi.');
+      return;
+    }
+
     // ❌ Kanalni olib tashlash: channels jadvalidagi barcha kanallar ro'yxati va o'chirish tugmalari
     if (text === '❌ Kanalni olib tashlash') {
       const channels = await getChannels();
