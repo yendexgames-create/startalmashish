@@ -759,6 +759,11 @@
 
     // Agar real kandidat ma'lumoti bo'lsa, kartani shu ma'lumotlar bilan to'ldiramiz
     if (currentExchangeCandidate) {
+      if (exchangeUserAvatar) {
+        const name = currentExchangeCandidate.name || '';
+        const initial = name.trim() ? name.trim().charAt(0).toUpperCase() : 'U';
+        exchangeUserAvatar.textContent = initial;
+      }
       if (exchangeUserName) {
         exchangeUserName.textContent = currentExchangeCandidate.name || 'Foydalanuvchi';
       }
