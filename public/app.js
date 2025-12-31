@@ -27,6 +27,8 @@
   const tileRefInfo = document.getElementById('tile-ref-info');
   const tileStatsInfo = document.getElementById('tile-stats-info');
 
+  const exchangeHeroCard = document.querySelector('#view-exchange .hero-card');
+
   // Almashish kartasi elementlari
   const exchangeCard = document.getElementById('exchange-card');
   const exchangeUserAvatar = document.getElementById('exchange-user-avatar');
@@ -306,6 +308,29 @@
       const slotsData = slotsRes.ok ? await slotsRes.json() : null;
       const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
 
+      const links = slotsData && Array.isArray(slotsData.links) ? slotsData.links : [];
+      const activeSlots = links.filter((l) => l.link).length;
+      const totalSlots = (slotsData && slotsData.slots) || meData.user.slots || 1;
+
+      // Asosiy bo'limlarni chizish
+      renderProfile(meData.user, u, { activeSlots, totalSlots });
+      renderSlots(slotsData || null);
+      renderFriends(friendsData.friends || []);
+
+      // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
+      if (homeUsername) {
+        homeUsername.textContent = meData.user.username
+          ? '@' + meData.user.username
+          : u.username
+          ? '@' + u.username
+          : 'Foydalanuvchi';
+      }
+      if (homeSlotsShort) {
+        homeSlotsShort.textContent = `Slotlar: ${activeSlots}/${totalSlots}`;
+      }
+      if (tileSlotsInfo) {
+        tileSlotsInfo.textContent = `${activeSlots} / ${totalSlots} ochiq`;
+      }
       if (tileFriendsInfo) {
         const friendsCount = (friendsData.friends && friendsData.friends.length) || 0;
         tileFriendsInfo.textContent = `${friendsCount} ta`;
