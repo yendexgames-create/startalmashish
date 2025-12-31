@@ -1797,9 +1797,13 @@ bot.action(/ex_reject_(\d+)/, async (ctx) => {
   }
 });
 
-bot.launch().then(() => {
-  console.log('Bot ishga tushdi');
-});
+bot.launch()
+  .then(() => {
+    console.log('Bot ishga tushdi');
+  })
+  .catch((err) => {
+    console.error('Botni ishga tushirishda xato (getMe yoki tarmoq):', err);
+  });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));

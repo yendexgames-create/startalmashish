@@ -368,9 +368,13 @@ adminBot.action(/deluser_(\d+)/, async (ctx) => {
   }
 });
 
-adminBot.launch().then(() => {
-  console.log('Admin bot ishga tushdi');
-});
+adminBot.launch()
+  .then(() => {
+    console.log('Admin bot ishga tushdi');
+  })
+  .catch((err) => {
+    console.error('Admin botni ishga tushirishda xato (getMe yoki tarmoq):', err);
+  });
 
 process.once('SIGINT', () => adminBot.stop('SIGINT'));
 process.once('SIGTERM', () => adminBot.stop('SIGTERM'));
