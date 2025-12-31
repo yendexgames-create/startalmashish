@@ -247,6 +247,7 @@ function getRandomCandidateForUser(telegramId, excludeIds = []) {
       if (err) return reject(err);
 
       const currentBot = extractBotNameFromLink(currentUser && currentUser.main_link);
+      const currentMainLink = currentUser && currentUser.main_link ? currentUser.main_link.trim() : null;
 
       db.all(
         'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
@@ -259,8 +260,17 @@ function getRandomCandidateForUser(telegramId, excludeIds = []) {
 
           const filtered = rows.filter((row) => {
             if (excludeIds.includes(row.telegram_id)) return false;
+
+            // Bir xil user bo'lmasligi (zaxira tekshiruv)
+            if (row.telegram_id === telegramId) return false;
+
             const botName = extractBotNameFromLink(row.main_link);
+            // Bir xil bot nomi bo'lmasin
             if (currentBot && botName && currentBot === botName) return false;
+
+            // Asosiy linki ham aynan bir xil bo'lmasin
+            if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
+
             return true;
           });
 
@@ -1119,47 +1129,230 @@ bot.on('web_app_data', async (ctx) => {
     payload = null;
   }
 
-  if (!payload || payload.type !== 'start_exchange') {
+  if (!payload || !payload.type) {
     return;
   }
 
-  const user = await findUserByTelegramId(telegramId);
-  if (!user) {
-    await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
-    return;
-  }
-
-  let links = [];
-  try {
-    links = await getUserLinks(telegramId);
-  } catch (e) {
-    console.error('user_links o‘qishda xato (web_app start):', e);
-  }
-
-  const availableSlots = [];
-  for (let i = 1; i <= Math.min(user.slots || 1, 3); i++) {
-    const slot = links.find((l) => l.slot_index === i && l.link);
-    if (slot) {
-      availableSlots.push({ index: i, link: slot.link });
+  // 1) WebAppdan almashishni boshlash: qaysi slot uchun qidirish
+  if (payload.type === 'start_exchange') {
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await ctx.reply('Avval /start buyrug‘i bilan ro‘yxatdan o‘ting.');
+      return;
     }
-  }
 
-  if (!availableSlots.length) {
+    let links = [];
+    try {
+      links = await getUserLinks(telegramId);
+    } catch (e) {
+      console.error('user_links o‘qishda xato (web_app start):', e);
+    }
+
+    const availableSlots = [];
+    for (let i = 1; i <= Math.min(user.slots || 1, 3); i++) {
+      const slot = links.find((l) => l.slot_index === i && l.link);
+      if (slot) {
+        availableSlots.push({ index: i, link: slot.link });
+      }
+    }
+
+    if (!availableSlots.length) {
+      await ctx.reply(
+        'Hali hech bir slotingiz uchun link kiritilmagan. Avval Web ilovada yoki botdagi profil bo‘limida kamida 1-slot uchun link qo‘ying.',
+        mainMenuKeyboard()
+      );
+      return;
+    }
+
+    const buttons = availableSlots.map((s) => [
+      Markup.button.callback(`${s.index}-slot: ${s.link}`, `slot_search_${s.index}`)
+    ]);
+
     await ctx.reply(
-      'Hali hech bir slotingiz uchun link kiritilmagan. Avval Web ilovada yoki botdagi profil bo‘limida kamida 1-slot uchun link qo‘ying.',
-      mainMenuKeyboard()
+      'Web ilovadan qaytdingiz. Qaysi slot uchun almashish topmoqchisiz? Slotni tanlang:',
+      Markup.inlineKeyboard(buttons)
     );
     return;
   }
 
-  const buttons = availableSlots.map((s) => [
-    Markup.button.callback(`${s.index}-slot: ${s.link}`, `slot_search_${s.index}`)
-  ]);
+  // 2) WebApp ichidagi "Bor" / "Keyingisi" tugmalari
+  if (payload.type === 'exchange_action') {
+    const action = payload.action;
 
-  await ctx.reply(
-    'Web ilovadan qaytdingiz. Qaysi slot uchun almashish topmoqchisiz? Slotni tanlang:',
-    Markup.inlineKeyboard(buttons)
-  );
+    if (action === 'next') {
+      // match_no bilan bir xil mantiq
+      const user = await findUserByTelegramId(telegramId);
+      if (!user || !user.main_link) {
+        return;
+      }
+
+      const currentCandidateId = currentCandidates.get(telegramId);
+      if (currentCandidateId) {
+        const seen = seenCandidates.get(telegramId) || new Set();
+        seen.add(currentCandidateId);
+        seenCandidates.set(telegramId, seen);
+        previousCandidates.set(telegramId, currentCandidateId);
+      }
+
+      const seen = seenCandidates.get(telegramId) || new Set();
+      const exclude = Array.from(seen);
+      const candidate = await getRandomCandidateForUser(telegramId, exclude);
+
+      if (!candidate) {
+        await ctx.reply(
+          'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.',
+          mainMenuKeyboard()
+        );
+        return;
+      }
+
+      await showCandidate(ctx, user, candidate);
+      return;
+    }
+
+    if (action === 'yes') {
+      // match_yes bilan bir xil mantiq
+      const user = await findUserByTelegramId(telegramId);
+      if (!user) {
+        return;
+      }
+
+      const candidateTelegramId = currentCandidates.get(telegramId);
+      if (!candidateTelegramId) {
+        await ctx.reply('Hozircha tanlangan link topilmadi, qaytadan urinib ko‘ring.');
+        return;
+      }
+      const candidate = await findUserByTelegramId(candidateTelegramId);
+      if (!candidate || !candidate.main_link) {
+        await ctx.reply('Bu foydalanuvchi hozircha almashish uchun mos emas.');
+        return;
+      }
+
+      const exchangeId = await createExchange(telegramId, candidateTelegramId);
+      activeExchanges.set(telegramId, exchangeId);
+      activeExchanges.set(candidateTelegramId, exchangeId);
+
+      await ctx.reply(
+        'Siz bu foydalanuvchi bilan almashish uchun so‘rov yubordingiz. Ikkinchi tomondan javob kutilyapti.',
+        mainMenuKeyboard()
+      );
+
+      const uName = user.name || '-';
+      const uUsername = user.username ? '@' + user.username : '-';
+      const uProfile = user.profile_link || (user.username ? `https://t.me/${user.username}` : '-');
+
+      // Tanlangan slotning linkini aniqlaymiz (agar topilmasa, main_linkga qaytamiz)
+      let uLink = user.main_link || '-';
+      const chosenSlot = searchSlots.get(telegramId);
+      if (chosenSlot) {
+        try {
+          const links = await getUserLinks(telegramId);
+          const slotRow = links.find((l) => l.slot_index === chosenSlot && l.link);
+          if (slotRow && slotRow.link) {
+            uLink = slotRow.link;
+          }
+        } catch (e) {
+          console.error('Tanlangan slot linkini olishda xato (web_app yes):', e);
+        }
+      }
+
+      const candidateText =
+        `Kimdir siz bilan start almashmoqchi:
+
+Ism: ${uName}
+Username: ${uUsername}
+Profil: ${uProfile}
+
+Sizning quyidagi linkingiz uchun:
+${uLink}
+
+Rozimisiz?`;
+
+      await bot.telegram.sendMessage(
+        candidateTelegramId,
+        candidateText,
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✅ Ha', `ex_accept_${exchangeId}`),
+            Markup.button.callback('❌ Yo‘q', `ex_reject_${exchangeId}`)
+          ]
+        ])
+      );
+      return;
+    }
+  }
+
+  // 3) WebApp dagi takliflar kartasidan kelgan javoblar
+  if (payload.type === 'offer_action') {
+    const action = payload.action;
+    const exchangeId = payload.exchange_id;
+    const slotIndex = payload.slot_index;
+
+    if (!exchangeId) {
+      return;
+    }
+
+    const ex = await getExchangeById(exchangeId);
+    if (!ex) {
+      await ctx.reply('Bu almashish topilmadi. Iltimos, qayta urinib ko‘ring.');
+      return;
+    }
+
+    // Faqat user2 (taklif qabul qiluvchi) bu yerga javob bera oladi
+    if (ex.user2_id !== telegramId || ex.status !== 'pending_partner') {
+      return;
+    }
+
+    const user2 = await findUserByTelegramId(telegramId);
+    const user1 = await findUserByTelegramId(ex.user1_id);
+
+    if (!user1 || !user2) {
+      return;
+    }
+
+    if (action === 'reject') {
+      await updateExchange(exchangeId, { status: 'rejected' });
+
+      try {
+        await bot.telegram.sendMessage(
+          ex.user1_id,
+          'Siz yuborgan almashish taklifi ikkinchi foydalanuvchi tomonidan rad etildi.'
+        );
+      } catch (e) {
+        // ignore
+      }
+
+      await ctx.reply('Siz bu almashish taklifini rad etdingiz.');
+      return;
+    }
+
+    if (action === 'accept') {
+      // Qaysi slot bo‘yicha qabul qilinganini saqlab qo‘yish uchun accounts_user2 maydoniga yozib qo'yamiz
+      const accountsUser2 = typeof slotIndex === 'number' ? slotIndex : null;
+
+      await updateExchange(exchangeId, { status: 'pending_accounts', accounts_user2: accountsUser2 });
+
+      const u2Name = user2.name || '-';
+      const u2Username = user2.username ? '@' + user2.username : '-';
+
+      try {
+        await bot.telegram.sendMessage(
+          ex.user1_id,
+          `Siz yuborgan almashish taklifiga ikkinchi foydalanuvchi rozilik bildirdi.
+
+Ism: ${u2Name}
+Username: ${u2Username}
+
+Endi almashish bo‘yicha keyingi ko‘rsatmalarga amal qiling.`
+        );
+      } catch (e) {
+        // ignore
+      }
+
+      await ctx.reply('Siz bu almashish taklifiga rozilik bildirdingiz.');
+      return;
+    }
+  }
 });
 
 // Referal xabari ichidagi "👤 Profilga o‘tish" tugmasi uchun callback
@@ -1361,7 +1554,7 @@ bot.action('match_no', async (ctx) => {
   await ctx.answerCbQuery();
   if (!candidate) {
     await ctx.reply(
-      'Hozircha siz uchun mos link topilmadi. Iltimos, birozdan so‘ng qayta urinib ko‘ring.',
+      'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.',
       mainMenuKeyboard()
     );
     return;

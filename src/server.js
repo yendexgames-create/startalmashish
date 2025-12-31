@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db, upsertUserLink } from './db.js';
+import { db, upsertUserLink, getUserLinks } from './db.js';
 
 // Botlarni ishga tushiramiz (side-effect imports)
 import './all_bots.js';
@@ -185,6 +185,76 @@ app.get('/api/friends', async (req, res) => {
     return res.json({ friends });
   } catch (e) {
     console.error('/api/friends xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Sizga kelgan almashish takliflari (user2 sifatida)
+app.get('/api/exchange/offers', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // exchanges jadvalidan statusi pending_partner bo'lgan, siz user2 bo'lganlar
+    const offers = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT e.id as exchange_id, e.user1_id, e.user2_id, e.status,
+                u.name as user1_name, u.username as user1_username,
+                u.profile_link as user1_profile_link, u.main_link as user1_main_link,
+                u.description as user1_description
+         FROM exchanges e
+         JOIN users u ON e.user1_id = u.telegram_id
+         WHERE e.user2_id = ? AND e.status = 'pending_partner'
+         ORDER BY e.created_at DESC`,
+        [telegramId],
+        (err, rows) => {
+          if (err) return reject(err);
+          resolve(rows || []);
+        }
+      );
+    });
+
+    // Har bir taklif uchun user1 ning slot linklarini ham qo'shamiz
+    const detailedOffers = await Promise.all(
+      offers.map(async (offer) => {
+        let slots = [];
+        try {
+          const links = await getUserLinks(offer.user1_id);
+          slots = links.map((l) => ({
+            slot_index: l.slot_index,
+            link: l.link,
+            description: l.description
+          }));
+        } catch (e) {
+          console.error('/api/exchange/offers getUserLinks xato:', e);
+        }
+
+        return {
+          exchange_id: offer.exchange_id,
+          status: offer.status,
+          from_user: {
+            telegram_id: offer.user1_id,
+            name: offer.user1_name,
+            username: offer.user1_username,
+            profile_link: offer.user1_profile_link,
+            main_link: offer.user1_main_link,
+            description: offer.user1_description
+          },
+          slots
+        };
+      })
+    );
+
+    return res.json({ offers: detailedOffers });
+  } catch (e) {
+    console.error('/api/exchange/offers xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });

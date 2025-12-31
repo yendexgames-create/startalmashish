@@ -7,6 +7,100 @@
     tg.ready();
   }
 
+  async function loadExchangeOffers(telegramId) {
+    if (!exchangeOffersCard || !exchangeOffersList || !exchangeOffersEmpty) return;
+
+    exchangeOffersCard.style.display = 'none';
+    exchangeOffersList.innerHTML = '';
+    exchangeOffersEmpty.style.display = 'block';
+
+    try {
+      const resp = await fetch(`/api/exchange/offers?telegram_id=${telegramId}`);
+      if (!resp.ok) {
+        console.error('exchange offers fetch xato:', resp.status);
+        return;
+      }
+
+      const data = await resp.json();
+      const offers = Array.isArray(data.offers) ? data.offers : [];
+
+      if (!offers.length) {
+        // Hech qanday taklif yo'q
+        exchangeOffersCard.style.display = 'none';
+        return;
+      }
+
+      exchangeOffersCard.style.display = 'block';
+      exchangeOffersEmpty.style.display = 'none';
+
+      offers.forEach((offer) => {
+        const u = offer.from_user || {};
+        const slots = Array.isArray(offer.slots) ? offer.slots : [];
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'offer-item';
+
+        const name = u.name || 'Foydalanuvchi';
+        const username = u.username ? `@${u.username}` : '';
+
+        let html = `<div class="offer-header"><div class="offer-name">${name}</div>`;
+        if (username) {
+          html += `<div class="offer-username">${username}</div>`;
+        }
+        html += '</div>';
+
+        if (slots.length) {
+          html += '<ul class="offer-slots">';
+          slots.forEach((s) => {
+            if (!s.link) return;
+            html += `
+              <li>
+                <div class="offer-slot-line">
+                  <span class="offer-slot-index">${s.slot_index}-slot:</span>
+                  <span class="offer-slot-link">${s.link}</span>
+                </div>
+                <div class="offer-slot-actions">
+                  <button
+                    class="primary-btn offer-accept-btn"
+                    data-exchange-id="${offer.exchange_id}"
+                    data-slot-index="${s.slot_index}"
+                  >Bor</button>
+                </div>
+              </li>`;
+          });
+          html += '</ul>';
+
+          if (slots.length > 1) {
+            html += `
+              <div class="offer-global-actions">
+                <button
+                  class="secondary-btn offer-reject-btn"
+                  data-exchange-id="${offer.exchange_id}"
+                >Hech qaysi biriga yoq</button>
+              </div>`;
+          } else {
+            html += `
+              <div class="offer-global-actions">
+                <button
+                  class="secondary-btn offer-reject-btn"
+                  data-exchange-id="${offer.exchange_id}"
+                >Yo'q</button>
+              </div>`;
+          }
+        } else {
+          html += '<p class="hint-text">Bu foydalanuvchi uchun slot linklari topilmadi.</p>';
+        }
+
+        html += '<div class="offer-status"></div>';
+
+        wrapper.innerHTML = html;
+        exchangeOffersList.appendChild(wrapper);
+      });
+    } catch (e) {
+      console.error('exchange offers yuklash xato:', e);
+    }
+  }
+
   const profileDiv = document.getElementById('profile-content');
   const slotsDiv = document.getElementById('slots-content');
   const friendsDiv = document.getElementById('friends-content');
@@ -41,6 +135,10 @@
   const exchangeYesBtn = document.getElementById('exchange-yes');
   const exchangeNoBtn = document.getElementById('exchange-no');
   const exchangeNextBtn = document.getElementById('exchange-next');
+  const exchangeOffersCard = document.getElementById('exchange-offers-card');
+  const exchangeOffersEmpty = document.getElementById('exchange-offers-empty');
+  const exchangeOffersList = document.getElementById('exchange-offers-list');
+  const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
   const tutorialOverlay = document.getElementById('tutorial-overlay');
@@ -330,6 +428,9 @@
       renderProfile(meData.user, u, { activeSlots, totalSlots });
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
+
+      // Sizga kelgan takliflarni yuklaymiz
+      await loadExchangeOffers(telegramId);
 
       // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
       if (homeUsername) {
@@ -719,6 +820,12 @@
   if (exchangeYesBtn) {
     exchangeYesBtn.addEventListener('click', () => {
       sendExchangeAction('yes');
+
+      if (exchangeStatus) {
+        exchangeStatus.textContent =
+          'Taklif yuborildi. Ikkinchi foydalanuvchi rozilik yoki rad javobini berganda botda va bu yerda yangilanadi.';
+        exchangeStatus.style.display = 'block';
+      }
     });
   }
 
@@ -726,6 +833,11 @@
   if (exchangeNextBtn) {
     exchangeNextBtn.addEventListener('click', () => {
       sendExchangeAction('next');
+
+      if (exchangeStatus) {
+        exchangeStatus.textContent = '';
+        exchangeStatus.style.display = 'none';
+      }
     });
   }
 
@@ -739,6 +851,63 @@
   if (exchangeOpenBotBtn) {
     exchangeOpenBotBtn.addEventListener('click', () => {
       openCurrentBotLink();
+    });
+  }
+
+  // Takliflar kartasidagi Bor/Yo'q tugmalari
+  if (exchangeOffersList) {
+    exchangeOffersList.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!tg || !tg.sendData) return;
+
+      const acceptBtn = target.closest('.offer-accept-btn');
+      const rejectBtn = target.closest('.offer-reject-btn');
+
+      if (acceptBtn) {
+        const exchangeId = acceptBtn.getAttribute('data-exchange-id');
+        const slotIndex = acceptBtn.getAttribute('data-slot-index');
+        if (!exchangeId || !slotIndex) return;
+
+        tg.sendData(
+          JSON.stringify({
+            type: 'offer_action',
+            action: 'accept',
+            exchange_id: Number(exchangeId),
+            slot_index: Number(slotIndex)
+          })
+        );
+
+        const offerItem = acceptBtn.closest('.offer-item');
+        if (offerItem) {
+          const statusEl = offerItem.querySelector('.offer-status');
+          if (statusEl) {
+            statusEl.textContent = 'Siz bu taklifga rozilik bildirdingiz. Almashish bo‘yicha keyingi qadamlarni botdan kuzating.';
+          }
+        }
+
+        return;
+      }
+
+      if (rejectBtn) {
+        const exchangeId = rejectBtn.getAttribute('data-exchange-id');
+        if (!exchangeId) return;
+
+        tg.sendData(
+          JSON.stringify({
+            type: 'offer_action',
+            action: 'reject',
+            exchange_id: Number(exchangeId)
+          })
+        );
+
+        const offerItem = rejectBtn.closest('.offer-item');
+        if (offerItem) {
+          const statusEl = offerItem.querySelector('.offer-status');
+          if (statusEl) {
+            statusEl.textContent = 'Siz bu almashish taklifini rad etdingiz.';
+          }
+        }
+      }
     });
   }
 
