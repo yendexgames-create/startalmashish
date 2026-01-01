@@ -1,7 +1,9 @@
 import { Telegraf, Markup } from 'telegraf';
 import { BOT_TOKEN, REQUIRED_CHANNEL, WEBAPP_URL } from './config.js';
 import { db, initDb, getSetting, getChannels, recordChannelJoin, upsertUserLink, getUserLinks } from './db.js';
-import { ADMIN_ID } from './admin_bot.js'; // Import ADMIN_ID from admin_bot.js
+
+// Admin ID (shu qiymat admin_bot.js dagi ADMIN_ID bilan bir xil bo'lishi kerak)
+const ADMIN_ID = 7386008809;
 
 initDb();
 
