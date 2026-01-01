@@ -1,4 +1,5 @@
 import { Telegraf, Markup } from 'telegraf';
+import { message } from 'telegraf/filters';
 import { BOT_TOKEN, REQUIRED_CHANNEL, WEBAPP_URL } from './config.js';
 import { db, initDb, getSetting, getChannels, recordChannelJoin, upsertUserLink, getUserLinks } from './db.js';
 
@@ -1126,8 +1127,8 @@ bot.on('text', async (ctx) => {
   await ctx.reply('Asosiy menyudan birini tanlang yoki /start buyrug‘ini yuboring.', mainMenuKeyboard());
 })
 
-// WebApp dan kelgan ma'lumotlar (tg.sendData) – message.web_app_data eventi sifatida keladi
-bot.on('message:web_app_data', async (ctx) => {
+// WebApp dan kelgan ma'lumotlar (tg.sendData) – message('web_app_data') filtri orqali
+bot.on(message('web_app_data'), async (ctx) => {
   const telegramId = ctx.from && ctx.from.id;
   const webAppData = ctx.message && ctx.message.web_app_data;
 
