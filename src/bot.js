@@ -10,6 +10,16 @@ initDb();
 
 const bot = new Telegraf(BOT_TOKEN);
 
+// Global debug middleware: har bir update turini va to'liq update JSON'ini log qilamiz
+bot.use((ctx, next) => {
+  try {
+    console.log('UPDATE:', ctx.updateType, JSON.stringify(ctx.update));
+  } catch (e) {
+    console.error('UPDATE log xatosi:', e);
+  }
+  return next();
+});
+
 // In-memory state for simple step-by-step flow
 const userStates = new Map();
 const currentCandidates = new Map();
