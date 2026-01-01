@@ -123,7 +123,7 @@ function clearState(userId) {
 }
 
 function mainMenuKeyboard() {
-  return Markup.removeKeyboard();
+  return Markup.keyboard([['🧩 Web ilova']]).resize();
 }
 
 function exchangeWaitingKeyboard() {
