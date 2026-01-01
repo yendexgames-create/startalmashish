@@ -377,9 +377,15 @@ bot.start(async (ctx) => {
     // referrerId bo'lsa, keyingi bosqichda saqlash uchun state'ga qo'yamiz
     setState(telegramId, 'WAIT_PHONE', { referrerId });
   } else {
+    const mainMenu = Markup.keyboard([
+      ['🔁 Almashishni topish', '🧩 Web ilova'],
+      ['👤 Profil', '📚 Do‘stlar'],
+      ['👥 Do‘st taklif qilish', '✉️ Savol va takliflar']
+    ]).resize();
+
     await ctx.reply(
-      'Siz ro‘yxatdan o‘tgansiz. Endi pastdagi "Open" tugmasi orqali Web ilovani ochib profil va slotlaringizni boshqarishingiz mumkin.',
-      mainMenuKeyboard()
+      'Siz ro‘yxatdan o‘tgansiz. Pastdagi tugmalar orqali almashishni boshlashingiz yoki Web ilovani ochishingiz mumkin.',
+      mainMenu
     );
     clearState(telegramId);
   }
