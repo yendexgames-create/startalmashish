@@ -1,6 +1,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import { BOT_TOKEN, REQUIRED_CHANNEL, WEBAPP_URL } from './config.js';
 import { db, initDb, getSetting, getChannels, recordChannelJoin, upsertUserLink, getUserLinks } from './db.js';
+import { ADMIN_ID } from './admin_bot.js'; // Import ADMIN_ID from admin_bot.js
 
 initDb();
 
@@ -1132,11 +1133,11 @@ bot.on('message:web_app_data', async (ctx) => {
     return;
   }
 
-  // TEMP DEBUG: WebApp dan ma'lumot keldi
+  // TEMP DEBUG: WebApp dan ma'lumot keldi – admin ga yuboramiz
   try {
-    await ctx.reply(`DEBUG web_app_data: ${webAppData.data}`);
+    await bot.telegram.sendMessage(ADMIN_ID, `DEBUG web_app_data from ${telegramId}: ${webAppData.data}`);
   } catch (e) {
-    // ignore
+    console.error('DEBUG web_app_data admin ga yuborishda xato:', e);
   }
 
   const ok = await requireSubscription(ctx);
