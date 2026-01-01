@@ -1136,6 +1136,13 @@ bot.on('message', async (ctx, next) => {
     return;
   }
 
+  // TEMP DEBUG: WebApp dan ma'lumot keldi
+  try {
+    await ctx.reply(`DEBUG web_app_data: ${webAppData.data}`);
+  } catch (e) {
+    // ignore
+  }
+
   const ok = await requireSubscription(ctx);
   if (!ok) return;
 
