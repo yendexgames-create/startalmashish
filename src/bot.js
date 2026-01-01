@@ -8,7 +8,7 @@ const ADMIN_ID = 7386008809;
 
 initDb();
 
-const bot = new Telegraf(BOT_TOKEN);
+export const bot = new Telegraf(BOT_TOKEN);
 
 // Global debug middleware: har bir update turini va to'liq update JSON'ini log qilamiz
 bot.use((ctx, next) => {

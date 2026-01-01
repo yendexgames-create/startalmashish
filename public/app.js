@@ -854,23 +854,89 @@
     });
   }
 
-  function sendExchangeAction(action) {
-    if (!tg) return;
-    try {
-      const candidateId = currentExchangeCandidate && currentExchangeCandidate.telegramId
-        ? currentExchangeCandidate.telegramId
-        : null;
+  async function sendExchangeAction(action) {
+    const candidateId = currentExchangeCandidate && currentExchangeCandidate.telegramId
+      ? currentExchangeCandidate.telegramId
+      : null;
 
-      tg.sendData(
-        JSON.stringify({
-          type: 'exchange_action',
-          action,
-          candidate_id: candidateId
-        })
-      );
-    } catch (e) {
-      console.error('exchange_action sendData xato:', e);
-      tg.showAlert('Almashish javobini yuborishda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
+    if (action === 'yes') {
+      if (!tg || !currentTelegramId) {
+        if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+        return;
+      }
+
+      if (!candidateId) {
+        tg.showAlert('Hozircha tanlangan foydalanuvchi topilmadi, qaytadan urinib ko‘ring.');
+        return;
+      }
+
+      try {
+        const resp = await fetch('/api/exchange/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from_telegram_id: currentTelegramId,
+            candidate_telegram_id: candidateId
+          })
+        });
+
+        const data = await resp.json().catch(() => null);
+
+        if (!resp.ok || !data || !data.ok) {
+          const msg = (data && data.error) || 'Almashish so‘rovini yuborishda xatolik yuz berdi.';
+          tg.showAlert(msg);
+          return;
+        }
+
+        tg.showAlert('Almashish so‘rovi yuborildi. Javobni bot chatidan kuting.');
+      } catch (e) {
+        console.error('/api/exchange/create fetch xato:', e);
+        if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+      }
+
+      return;
+    }
+
+    if (action === 'next') {
+      if (!currentTelegramId) {
+        if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const c = data && data.candidate ? data.candidate : null;
+
+          if (!c) {
+            if (tg) {
+              tg.showAlert(
+                'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.'
+              );
+            }
+            return;
+          }
+
+          currentExchangeCandidate = {
+            telegramId: c.telegram_id,
+            name: c.name || 'Foydalanuvchi',
+            username: c.username || '',
+            profileLink: c.profile_link || '',
+            botUrl: c.main_link || '',
+            description: c.description || ''
+          };
+
+          fillExchangeCardFromCandidate();
+        } else {
+          if (tg) tg.showAlert('Kandidatni yuklashda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
+        }
+      } catch (e) {
+        console.error('exchange/match fetch xato (next):', e);
+        if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+      }
     }
   }
 

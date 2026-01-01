@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, upsertUserLink, getUserLinks } from './db.js';
+import { bot } from './bot.js';
 
 // Botlarni ishga tushiramiz (side-effect imports)
 import './all_bots.js';
@@ -34,6 +35,21 @@ function findUserByTelegramId(telegramId) {
       if (err) return reject(err);
       resolve(row || null);
     });
+  });
+}
+
+function createExchangeRow(user1Id, user2Id) {
+  const now = Date.now();
+  const deadline = now + 48 * 60 * 60 * 1000; // 48 soat
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO exchanges (user1_id, user2_id, status, created_at, deadline) VALUES (?, ?, 'pending_partner', ?, ?)`,
+      [user1Id, user2Id, now, deadline],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.lastID);
+      }
+    );
   });
 }
 
@@ -111,6 +127,58 @@ app.get('/api/me', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/me xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// WebApp'dan "Bor" bosilganda almashishni yaratish va user2 ga xabar yuborish
+app.post('/api/exchange/create', async (req, res) => {
+  try {
+    const { from_telegram_id, candidate_telegram_id } = req.body || {};
+
+    const fromId = parseInt(from_telegram_id, 10);
+    const candId = parseInt(candidate_telegram_id, 10);
+
+    if (!fromId || !candId) {
+      return res.status(400).json({ error: 'from_telegram_id va candidate_telegram_id body da kerak' });
+    }
+
+    const user = await findUserByTelegramId(fromId);
+    const candidate = await findUserByTelegramId(candId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'from_telegram_id foydalanuvchisi topilmadi' });
+    }
+    if (!candidate) {
+      return res.status(404).json({ error: 'candidate_telegram_id foydalanuvchisi topilmadi' });
+    }
+
+    const exchangeId = await createExchangeRow(fromId, candId);
+
+    // user1 dan foydalanib, user2 ga yuboriladigan matn
+    let uLink = user.main_link || '-';
+
+    const candidateText =
+      `Kimdir siz bilan start almashmoqchi.
+
+Sizning quyidagi linkingiz uchun:
+${uLink}
+
+Iltimos, pastdagi tugmalar orqali qaror bering.
+Agar xohlasangiz, bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, almashish tafsilotlarini ko'rishingiz mumkin.
+
+Rozimisiz?`;
+
+    try {
+      await bot.telegram.sendMessage(candId, candidateText);
+    } catch (e) {
+      console.error('/api/exchange/create sendMessage xato:', e);
+      // Xabar yuborishda xato bo'lsa ham, exchange yaratilgan bo'ladi
+    }
+
+    return res.json({ ok: true, exchange_id: exchangeId });
+  } catch (e) {
+    console.error('/api/exchange/create xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });
