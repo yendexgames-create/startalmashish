@@ -1123,16 +1123,25 @@ bot.on('text', async (ctx) => {
   await ctx.reply('Asosiy menyudan birini tanlang yoki /start buyrug‘ini yuboring.', mainMenuKeyboard());
 })
 
-// WebApp dan kelgan ma'lumotlar (tg.sendData)
-bot.on('web_app_data', async (ctx) => {
-  const telegramId = ctx.from.id;
+// WebApp dan kelgan ma'lumotlar (tg.sendData) – bu aslida message.web_app_data sifatida keladi
+bot.on('message', async (ctx, next) => {
+  const telegramId = ctx.from && ctx.from.id;
+  const webAppData = ctx.message && ctx.message.web_app_data;
+
+  // Agar bu xabar WebApp'dan kelmagan bo'lsa, boshqa handlerlarga o'tkazamiz
+  if (!webAppData || !webAppData.data) {
+    if (typeof next === 'function') {
+      return next();
+    }
+    return;
+  }
 
   const ok = await requireSubscription(ctx);
   if (!ok) return;
 
   let payload = null;
   try {
-    payload = ctx.webAppData && ctx.webAppData.data ? JSON.parse(ctx.webAppData.data) : null;
+    payload = JSON.parse(webAppData.data);
   } catch (e) {
     payload = null;
   }
