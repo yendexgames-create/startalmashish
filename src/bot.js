@@ -371,6 +371,19 @@ bot.start(async (ctx) => {
   }
 });
 
+// TEMP DEBUG: barcha callback_query larni ko'ramiz
+bot.on('callback_query', async (ctx, next) => {
+  try {
+    const data = ctx.callbackQuery && ctx.callbackQuery.data ? ctx.callbackQuery.data : '<no data>';
+    await ctx.reply(`DEBUG callback: ${data}`);
+  } catch (e) {
+    // ignore
+  }
+  if (typeof next === 'function') {
+    return next();
+  }
+});
+
 bot.action('check_sub', async (ctx) => {
   const ok = await requireSubscription(ctx);
   if (ok) {
