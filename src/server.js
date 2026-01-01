@@ -455,6 +455,99 @@ app.get('/api/exchange/offers', async (req, res) => {
   }
 });
 
+// WebApp'dan kelgan taklifga (user2 tomoni) Bor/Yo'q javobini qayta ishlash
+app.post('/api/exchange/offer_action', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id, action } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+
+    if (!userId || !exId || !action) {
+      return res.status(400).json({ error: 'telegram_id, exchange_id va action body da kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    // Faqat user2 (taklif qabul qiluvchi) bu yerga javob bera oladi va status pending_partner bo'lishi kerak
+    if (ex.user2_id !== userId || ex.status !== 'pending_partner') {
+      return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi yoki allaqachon yangilangan' });
+    }
+
+    const user1Id = ex.user1_id;
+    const user2Id = ex.user2_id;
+
+    const user1 = await findUserByTelegramId(user1Id);
+    const user2 = await findUserByTelegramId(user2Id);
+
+    if (!user1 || !user2) {
+      return res.status(404).json({ error: 'Foydalanuvchilardan biri topilmadi' });
+    }
+
+    if (action === 'accept') {
+      await new Promise((resolve, reject) => {
+        db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['accepted_partner', exId], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      const uLink = user1.main_link || '-';
+      const msg =
+        `Siz yuborgan quyidagi linkingiz egasi almashishga ROZI bo'ldi:
+${uLink}
+
+Endi almashishni davom ettirish uchun "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, takliflar bo'limini ko'rib chiqing.`;
+
+      try {
+        await bot.telegram.sendMessage(user1Id, msg);
+      } catch (e) {
+        console.error('/api/exchange/offer_action accept sendMessage xato:', e);
+      }
+
+      return res.json({ ok: true, status: 'accepted_partner' });
+    }
+
+    if (action === 'reject') {
+      await new Promise((resolve, reject) => {
+        db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['rejected_partner', exId], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      const uLink = user1.main_link || '-';
+      const msg =
+        `Siz yuborgan quyidagi linkingiz bo'yicha taklif QABUL QILINMADI:
+${uLink}
+
+Bu foydalanuvchi almashishni rad etdi. Istasangiz, boshqa sheriklar bilan almashishni davom ettirishingiz mumkin.`;
+
+      try {
+        await bot.telegram.sendMessage(user1Id, msg);
+      } catch (e) {
+        console.error('/api/exchange/offer_action reject sendMessage xato:', e);
+      }
+
+      return res.json({ ok: true, status: 'rejected_partner' });
+    }
+
+    return res.status(400).json({ error: 'action faqat accept yoki reject bo‘lishi mumkin' });
+  } catch (e) {
+    console.error('/api/exchange/offer_action xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`HTTP server ishga tushdi: http://localhost:${PORT}`);
 });

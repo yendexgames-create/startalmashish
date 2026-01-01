@@ -1262,15 +1262,14 @@ bot.on(message('web_app_data'), async (ctx) => {
       }
 
       const candidateText =
-        `Kimdir siz bilan start almashmoqchi.
+        `${uName} siz bilan start almashmoqchi.
 
-Sizning quyidagi linkingiz uchun:
+Sizning quyidagi linkingiz uchun taklif yubordi:
 ${uLink}
 
-Iltimos, pastdagi tugmalar orqali qaror bering.
-Agar xohlasangiz, bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, almashish tafsilotlarini ko'rishingiz mumkin.
-
-Rozimisiz?`;
+Qanday davom etish kerak:
+1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.
+2. Almashish bo‘limida bu taklif tafsilotlarini ko‘rasiz va qaror qabul qilasiz.`;
 
       await bot.telegram.sendMessage(candidateTelegramId, candidateText);
       return;
@@ -1657,13 +1656,14 @@ bot.action('match_yes', async (ctx) => {
   }
 
   const candidateText =
-    `Kimdir siz bilan start almashmoqchi.
+    `${uName} siz bilan start almashmoqchi.
 
-Sizning quyidagi linkingiz uchun:
+Sizning quyidagi linkingiz uchun taklif yubordi:
 ${uLink}
 
-Iltimos, almashish tafsilotlarini Web ilova ichida ko'rib chiqing.
-Bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochishingiz mumkin.`;
+Qanday davom etish kerak:
+1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.
+2. Almashish bo‘limida bu taklif tafsilotlarini ko‘rasiz va qaror qabul qilasiz.`;
 
   await bot.telegram.sendMessage(candidateTelegramId, candidateText);
 });

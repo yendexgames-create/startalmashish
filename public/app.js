@@ -996,7 +996,7 @@
   if (exchangeOffersList) {
     exchangeOffersList.addEventListener('click', (e) => {
       const target = e.target;
-      if (!tg || !tg.sendData) return;
+      if (!tg) return;
 
       const acceptBtn = target.closest('.offer-accept-btn');
       const rejectBtn = target.closest('.offer-reject-btn');
@@ -1004,47 +1004,80 @@
       if (acceptBtn) {
         const exchangeId = acceptBtn.getAttribute('data-exchange-id');
         const slotIndex = acceptBtn.getAttribute('data-slot-index');
-        if (!exchangeId || !slotIndex) return;
+        if (!exchangeId || !slotIndex || !currentTelegramId) return;
 
-        tg.sendData(
-          JSON.stringify({
-            type: 'offer_action',
-            action: 'accept',
+        fetch('/api/exchange/offer_action', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
             exchange_id: Number(exchangeId),
+            action: 'accept',
             slot_index: Number(slotIndex)
           })
-        );
-
-        const offerItem = acceptBtn.closest('.offer-item');
-        if (offerItem) {
-          const statusEl = offerItem.querySelector('.offer-status');
-          if (statusEl) {
-            statusEl.textContent = 'Siz bu taklifga rozilik bildirdingiz. Almashish bo‘yicha keyingi qadamlarni botdan kuzating.';
-          }
-        }
+        })
+          .then((r) => r.json().catch(() => null))
+          .then((data) => {
+            const offerItem = acceptBtn.closest('.offer-item');
+            if (offerItem) {
+              const statusEl = offerItem.querySelector('.offer-status');
+              if (statusEl) {
+                if (data && data.ok) {
+                  statusEl.textContent =
+                    'Siz bu taklifga rozilik bildirdingiz. Almashish bo‘yicha keyingi qadamlarni botdan kuzating.';
+                } else {
+                  statusEl.textContent =
+                    (data && data.error) ||
+                    'Taklifni qabul qilishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
+                }
+              }
+            }
+          })
+          .catch((err) => {
+            console.error('offer_action accept xato:', err);
+            if (tg) tg.showAlert('Taklifni qabul qilishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.');
+          });
 
         return;
       }
 
       if (rejectBtn) {
         const exchangeId = rejectBtn.getAttribute('data-exchange-id');
-        if (!exchangeId) return;
+        if (!exchangeId || !currentTelegramId) return;
 
-        tg.sendData(
-          JSON.stringify({
-            type: 'offer_action',
-            action: 'reject',
-            exchange_id: Number(exchangeId)
+        fetch('/api/exchange/offer_action', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
+            exchange_id: Number(exchangeId),
+            action: 'reject'
           })
-        );
-
-        const offerItem = rejectBtn.closest('.offer-item');
-        if (offerItem) {
-          const statusEl = offerItem.querySelector('.offer-status');
-          if (statusEl) {
-            statusEl.textContent = 'Siz bu almashish taklifini rad etdingiz.';
-          }
-        }
+        })
+          .then((r) => r.json().catch(() => null))
+          .then((data) => {
+            const offerItem = rejectBtn.closest('.offer-item');
+            if (offerItem) {
+              const statusEl = offerItem.querySelector('.offer-status');
+              if (statusEl) {
+                if (data && data.ok) {
+                  statusEl.textContent = 'Siz bu almashish taklifini rad etdingiz.';
+                } else {
+                  statusEl.textContent =
+                    (data && data.error) ||
+                    'Taklifni rad etishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
+                }
+              }
+            }
+          })
+          .catch((err) => {
+            console.error('offer_action reject xato:', err);
+            if (tg) tg.showAlert('Taklifni rad etishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.');
+          });
       }
     });
   }
