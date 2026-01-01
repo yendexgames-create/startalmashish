@@ -845,9 +845,6 @@
         return;
       }
 
-      // Botga almashishni boshlash haqida xabar yuboramiz (slot tanlash va haqiqiy kandidat uchun)
-      sendStartExchange();
-
       // Hero cardni yashiramiz, almashish kartasini esa real kandidat bilan ko'rsatamiz
       if (exchangeHeroCard) {
         exchangeHeroCard.style.display = 'none';
