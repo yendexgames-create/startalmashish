@@ -128,12 +128,16 @@
 
         const name = u.name || 'Foydalanuvchi';
         const username = u.username ? `@${u.username}` : '';
+        const initial = name && name.trim() ? name.trim().charAt(0).toUpperCase() : 'U';
 
         let html = '<div class="offer-header">';
+        html += '<div class="friend-avatar">' + initial + '</div>';
+        html += '<div class="offer-main">';
         html += `<div class="offer-name">${name}</div>`;
         if (username) {
           html += `<div class="offer-username">${username}</div>`;
         }
+        html += '</div>';
         html += '</div>';
 
         if (slots.length) {
@@ -143,11 +147,11 @@
             html += `
               <li>
                 <div class="offer-slot-line">
-                  <div class="offer-slot-label">Qaysi link uchun:</div>
                   <button class="offer-slot-link-btn" type="button" data-url="${s.link}">
                     ${s.link}
                   </button>
                 </div>
+                <div class="offer-slot-question">Shu link uchun sizda start bormi?</div>
                 <div class="offer-slot-actions">
                   <button
                     class="primary-btn offer-accept-btn"
@@ -1462,7 +1466,8 @@
           },
           body: JSON.stringify({
             from_telegram_id: currentTelegramId,
-            candidate_telegram_id: candidateId
+            candidate_telegram_id: candidateId,
+            slot_index: currentSelectedSlotIndex || 1
           })
         });
 

@@ -432,10 +432,11 @@ app.post('/api/exchange/close_chat', async (req, res) => {
 // WebApp'dan "Bor" bosilganda almashishni yaratish va user2 ga xabar yuborish
 app.post('/api/exchange/create', async (req, res) => {
   try {
-    const { from_telegram_id, candidate_telegram_id } = req.body || {};
+    const { from_telegram_id, candidate_telegram_id, slot_index } = req.body || {};
 
     const fromId = parseInt(from_telegram_id, 10);
     const candId = parseInt(candidate_telegram_id, 10);
+    const selectedSlotIndex = parseInt(slot_index || 1, 10) || 1;
 
     if (!fromId || !candId) {
       return res.status(400).json({ error: 'from_telegram_id va candidate_telegram_id body da kerak' });
@@ -453,17 +454,28 @@ app.post('/api/exchange/create', async (req, res) => {
 
     const exchangeId = await createExchangeRow(fromId, candId);
 
-    // user1 dan foydalanib, user2 ga yuboriladigan matn
+    // Tanlangan slot bo'yicha linkni aniqlaymiz (agar topilmasa, asosiy main_link ishlatiladi)
+    let uLink = user.main_link || '-';
+    try {
+      const links = await getUserLinks(fromId);
+      const selectedSlot =
+        Array.isArray(links) && links.find((l) => l.slot_index === selectedSlotIndex && l.link);
+      if (selectedSlot && selectedSlot.link) {
+        uLink = selectedSlot.link;
+      }
+    } catch (e) {
+      console.error('/api/exchange/create getUserLinks xato:', e);
+    }
+
     const uName = user.name || '-';
-    const uLink = user.main_link || '-';
 
     const candidateText =
       `${uName} siz bilan start almashmoqchi.
 
-Sizning quyidagi linkingiz uchun taklif yubordi:
+Quyidagi linkingiz uchun sizdan start so‘ramoqda:
 ${uLink}
 
-Qanday davom etish kerak:
+Davom etish uchun:
 1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.
 2. Almashish bo‘limida bu taklif tafsilotlarini ko‘rasiz va qaror qabul qilasiz.`;
 
