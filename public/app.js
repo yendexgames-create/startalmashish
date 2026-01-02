@@ -7,6 +7,8 @@
     tg.ready();
   }
 
+  // Yuborilgan takliflar (Men tayyorman va link) va chat linki uchun listenerlar
+
   async function loadSentExchanges(telegramId) {
     if (!exchangeSentCard || !exchangeSentList || !exchangeSentEmpty) return;
 
@@ -54,7 +56,7 @@
 
         html += '<div class="sent-offer-body">';
         html += '<div class="sent-offer-link-label">Qaysi link uchun:</div>';
-        html += `<div class="sent-offer-link">${link}</div>`;
+        html += `<button type="button" class="sent-offer-link-btn" data-url="${link}">${link}</button>`;
         html += '</div>';
 
         html += '<div class="sent-offer-footer">';
@@ -111,7 +113,8 @@
         const name = u.name || 'Foydalanuvchi';
         const username = u.username ? `@${u.username}` : '';
 
-        let html = `<div class="offer-header"><div class="offer-name">${name}</div>`;
+        let html = '<div class="offer-header">';
+        html += `<div class="offer-name">${name}</div>`;
         if (username) {
           html += `<div class="offer-username">${username}</div>`;
         }
@@ -124,8 +127,10 @@
             html += `
               <li>
                 <div class="offer-slot-line">
-                  <span class="offer-slot-index">${s.slot_index}-slot:</span>
-                  <span class="offer-slot-link">${s.link}</span>
+                  <div class="offer-slot-label">Qaysi link uchun:</div>
+                  <button class="offer-slot-link-btn" type="button" data-url="${s.link}">
+                    ${s.link}
+                  </button>
                 </div>
                 <div class="offer-slot-actions">
                   <button
@@ -138,23 +143,13 @@
           });
           html += '</ul>';
 
-          if (slots.length > 1) {
-            html += `
-              <div class="offer-global-actions">
-                <button
-                  class="secondary-btn offer-reject-btn"
-                  data-exchange-id="${offer.exchange_id}"
-                >Hech qaysi biriga yoq</button>
-              </div>`;
-          } else {
-            html += `
-              <div class="offer-global-actions">
-                <button
-                  class="secondary-btn offer-reject-btn"
-                  data-exchange-id="${offer.exchange_id}"
-                >Yo'q</button>
-              </div>`;
-          }
+          html += `
+            <div class="offer-global-actions">
+              <button
+                class="secondary-btn offer-reject-btn"
+                data-exchange-id="${offer.exchange_id}"
+              >Hech qaysi biriga yoq</button>
+            </div>`;
         } else {
           html += '<p class="hint-text">Bu foydalanuvchi uchun slot linklari topilmadi.</p>';
         }
@@ -209,6 +204,10 @@
   const exchangeSentCard = document.getElementById('exchange-sent-card');
   const exchangeSentEmpty = document.getElementById('exchange-sent-empty');
   const exchangeSentList = document.getElementById('exchange-sent-list');
+  const exchangeChatCard = document.getElementById('exchange-chat-card');
+  const exchangeChatName = document.getElementById('exchange-chat-name');
+  const exchangeChatUsername = document.getElementById('exchange-chat-username');
+  const exchangeChatLink = document.getElementById('exchange-chat-link');
   const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
@@ -223,6 +222,35 @@
   let tutorialStep = 0;
   let currentExchangeCandidate = null;
   let hasExchangeCandidates = false;
+  let currentChatExchangeId = null;
+
+  function hideExchangeCards() {
+    if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
+    if (exchangeCard) exchangeCard.style.display = 'none';
+    if (exchangeOffersCard) exchangeOffersCard.style.display = 'none';
+    if (exchangeSentCard) exchangeSentCard.style.display = 'none';
+  }
+
+  function showExchangeChat(partner, exchangeId) {
+    currentChatExchangeId = exchangeId;
+    hideExchangeCards();
+
+    if (exchangeChatName) {
+      exchangeChatName.textContent = partner && partner.name ? partner.name : 'Sherik';
+    }
+    if (exchangeChatUsername) {
+      exchangeChatUsername.textContent = partner && partner.username ? `@${partner.username}` : '';
+    }
+    if (exchangeChatLink) {
+      const link = (partner && partner.main_link) || '';
+      exchangeChatLink.textContent = link || 'https://t.me/yourbot';
+      exchangeChatLink.dataset.url = link || '';
+    }
+
+    if (exchangeChatCard) {
+      exchangeChatCard.style.display = 'block';
+    }
+  }
 
   function getTutorialStorageKey() {
     const base = 'tutorial_done';
@@ -453,10 +481,11 @@
     currentTelegramId = telegramId;
 
     try {
-      const [meRes, slotsRes, friendsRes] = await Promise.all([
+      const [meRes, slotsRes, friendsRes, activeChatRes] = await Promise.all([
         fetch(`/api/me?telegram_id=${telegramId}`),
         fetch(`/api/slots?telegram_id=${telegramId}`),
-        fetch(`/api/friends?telegram_id=${telegramId}`)
+        fetch(`/api/friends?telegram_id=${telegramId}`),
+        fetch(`/api/exchange/active_chat?telegram_id=${telegramId}`)
       ]);
 
       // Ro'yxatdan o'tmagan foydalanuvchi
@@ -488,6 +517,7 @@
 
       const slotsData = slotsRes.ok ? await slotsRes.json() : null;
       const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
+      const activeChatData = activeChatRes.ok ? await activeChatRes.json() : { active: null };
 
       const links = slotsData && Array.isArray(slotsData.links) ? slotsData.links : [];
       const activeSlots = links.filter((l) => l.link).length;
@@ -515,11 +545,15 @@
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
 
-      // Sizga kelgan takliflarni yuklaymiz
-      await loadExchangeOffers(telegramId);
-
-      // Siz yuborgan takliflarni yuklaymiz
-      await loadSentExchanges(telegramId);
+      // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
+      const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
+      if (activeChat && activeChat.partner) {
+        showExchangeChat(activeChat.partner, activeChat.exchange_id);
+      } else {
+        // Sizga kelgan va yuborgan takliflarni yuklaymiz (faqat chat yo'q bo'lsa)
+        await loadExchangeOffers(telegramId);
+        await loadSentExchanges(telegramId);
+      }
 
       // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
       if (homeUsername) {
@@ -940,7 +974,7 @@
       }
 
       if (!candidateId) {
-        tg.showAlert('Hozircha tanlangan foydalanuvchi topilmadi, qaytadan urinib ko‘ring.');
+        if (tg) tg.showAlert('Hozircha tanlangan foydalanuvchi topilmadi, qaytadan urinib ko‘ring.');
         return;
       }
 
@@ -960,11 +994,13 @@
 
         if (!resp.ok || !data || !data.ok) {
           const msg = (data && data.error) || 'Almashish so‘rovini yuborishda xatolik yuz berdi.';
-          tg.showAlert(msg);
+          if (tg) tg.showAlert(msg);
           return;
         }
 
-        tg.showAlert('Almashish so‘rovi yuborildi. Javobni bot chatidan kuting.');
+        if (tg) {
+          tg.showAlert('Almashish so‘rovi yuborildi. Javobni bot chatidan kuting.');
+        }
       } catch (e) {
         console.error('/api/exchange/create fetch xato:', e);
         if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
@@ -1074,6 +1110,19 @@
 
       const acceptBtn = target.closest('.offer-accept-btn');
       const rejectBtn = target.closest('.offer-reject-btn');
+      const linkBtn = target.closest('.offer-slot-link-btn');
+
+      if (linkBtn) {
+        const url = linkBtn.getAttribute('data-url');
+        if (url) {
+          if (tg && typeof tg.openTelegramLink === 'function') {
+            tg.openTelegramLink(url);
+          } else {
+            window.open(url, '_blank');
+          }
+        }
+        return;
+      }
 
       if (acceptBtn) {
         const exchangeId = acceptBtn.getAttribute('data-exchange-id');

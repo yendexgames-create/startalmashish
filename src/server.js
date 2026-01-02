@@ -131,6 +131,139 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// "Men tayyorman" bosilganda almashishni chatga tayyor deb belgilash
+app.post('/api/exchange/ready', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+
+    if (!userId || !exId) {
+      return res.status(400).json({ error: 'telegram_id va exchange_id body da kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    // Faqat shu almashishda qatnashayotgan va statusi accepted_partner bo'lgan user tayyor deb belgilashi mumkin
+    if ((ex.user1_id !== userId && ex.user2_id !== userId) || ex.status !== 'accepted_partner') {
+      return res
+        .status(400)
+        .json({ error: 'Bu almashish siz uchun amal qilmaydi yoki hali qabul qilinmagan' });
+    }
+
+    const isUser1 = ex.user1_id === userId;
+    const otherId = isUser1 ? ex.user2_id : ex.user1_id;
+
+    const user = await findUserByTelegramId(userId);
+    const otherUser = await findUserByTelegramId(otherId);
+
+    if (!user || !otherUser) {
+      return res.status(404).json({ error: 'Foydalanuvchilardan biri topilmadi' });
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['ready_chat', exId], (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+    const linkForOther = user.main_link || '-';
+    const msg =
+      `Almashmoqchi bo'lgan odamingiz tayyor. Chatni boshlashingiz mumkin.
+
+Quyidagi link orqali sherigingiz botiga oting:
+${linkForOther}`;
+
+    try {
+      await bot.telegram.sendMessage(otherId, msg);
+    } catch (e) {
+      console.error('/api/exchange/ready sendMessage xato:', e);
+    }
+
+    // Frontend uchun sherik ma'lumotini qaytaramiz
+    return res.json({
+      ok: true,
+      exchange_id: exId,
+      partner: {
+        telegram_id: otherUser.telegram_id,
+        name: otherUser.name,
+        username: otherUser.username,
+        profile_link: otherUser.profile_link,
+        main_link: otherUser.main_link,
+        description: otherUser.description
+      }
+    });
+  } catch (e) {
+    console.error('/api/exchange/ready xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Hozirgi foydalanuvchi uchun agar ready_chat holatidagi almashish bo'lsa, uni qaytarish
+app.get('/api/exchange/active_chat', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM exchanges
+         WHERE status = 'ready_chat' AND (user1_id = ? OR user2_id = ?)
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [telegramId, telegramId],
+        (err, row) => {
+          if (err) return reject(err);
+          resolve(row || null);
+        }
+      );
+    });
+
+    if (!ex) {
+      return res.json({ active: null });
+    }
+
+    const isUser1 = ex.user1_id === telegramId;
+    const otherId = isUser1 ? ex.user2_id : ex.user1_id;
+
+    const otherUser = await findUserByTelegramId(otherId);
+    if (!otherUser) {
+      return res.json({ active: null });
+    }
+
+    return res.json({
+      active: {
+        exchange_id: ex.id,
+        role: isUser1 ? 'user1' : 'user2',
+        partner: {
+          telegram_id: otherUser.telegram_id,
+          name: otherUser.name,
+          username: otherUser.username,
+          profile_link: otherUser.profile_link,
+          main_link: otherUser.main_link,
+          description: otherUser.description
+        }
+      }
+    });
+  } catch (e) {
+    console.error('/api/exchange/active_chat xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // WebApp'dan "Bor" bosilganda almashishni yaratish va user2 ga xabar yuborish
 app.post('/api/exchange/create', async (req, res) => {
   try {
