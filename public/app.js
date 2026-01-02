@@ -671,7 +671,24 @@
       // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
       const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
       if (activeChat && activeChat.partner) {
-        showExchangeChat(activeChat.partner, activeChat.exchange_id);
+        // Agar foydalanuvchi shu chatni avval yopgan bo'lsa, avtomatik ochmaymiz
+        let shouldShowChat = true;
+        try {
+          const closedKey = `chat_closed_${telegramId}_${activeChat.exchange_id}`;
+          const closedVal = window.localStorage.getItem(closedKey);
+          if (closedVal === '1') {
+            shouldShowChat = false;
+          }
+        } catch (e) {
+          // storage xatosini e'tiborsiz qoldiramiz
+        }
+
+        if (shouldShowChat) {
+          showExchangeChat(activeChat.partner, activeChat.exchange_id);
+        } else {
+          await loadExchangeOffers(telegramId);
+          await loadSentExchanges(telegramId);
+        }
       } else {
         // Sizga kelgan va yuborgan takliflarni yuklaymiz (faqat chat yo'q bo'lsa)
         await loadExchangeOffers(telegramId);
@@ -1223,6 +1240,16 @@
       // Asosiy almashish kartalarini qayta ko'rsatamiz
       if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
       if (exchangeCard) exchangeCard.style.display = 'none';
+
+      // Ushbu almashish bo'yicha chatni yopganimizni eslab qolamiz
+      if (currentTelegramId && currentChatExchangeId) {
+        const key = `chat_closed_${currentTelegramId}_${currentChatExchangeId}`;
+        try {
+          window.localStorage.setItem(key, '1');
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
 
       if (currentTelegramId) {
         // Takliflar va yuborilgan takliflarni yangilab olamiz
