@@ -1687,7 +1687,9 @@
           }
 
           const refUrl = data.referral_link;
-          const text = 'Bu botga shu referal link orqali kiring:';
+          const text =
+            '👥 Do‘stlarni taklif qilish\n\n' +
+            'Men shu botdan start almashish uchun foydalanayapman. Agar sen ham sinab ko‘rmoqchi bo‘lsang, pastdagi referal link orqali kir:\n';
           const shareUrl =
             'https://t.me/share/url?url=' +
             encodeURIComponent(refUrl) +

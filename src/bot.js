@@ -510,14 +510,16 @@ bot.on('contact', async (ctx) => {
       '🎉 Sizning referal linkingiz orqali yangi foydalanuvchi botga qo‘shildi.\n' +
       `Ism: ${invitedName}\n` +
       `Username: ${invitedUsername}\n\n` +
-      'Bu taklif uchun sizga 2 ta yangi slot ochildi.\n\n' +
-      'Profilingizdan yangi slotlar uchun link qo‘shishingiz mumkin.';
+      'Bu taklif uchun sizga qo‘shimcha slotlar ochiladi. Har bir taklif qilingan do‘st uchun bitta slot qo‘shilib boradi (jami 3 tagacha).\n\n' +
+      'Web ilovada slotlar bo‘limiga o‘tib, yangi slot(lar) uchun link qo‘shishingiz mumkin.';
 
     try {
-      await bot.telegram.sendMessage(
+      await ctx.telegram.sendMessage(
         referrerId,
         inviterText,
-        Markup.inlineKeyboard([[Markup.button.callback('👤 Profilga o‘tish', 'open_profile')]])
+        Markup.inlineKeyboard([
+          [Markup.button.webApp('🔗 Slotlarni to‘ldirish', WEBAPP_URL)]
+        ])
       );
     } catch (e) {
       // agar xabar yuborishda xato bo'lsa, bot ishini to'xtatmaymiz
