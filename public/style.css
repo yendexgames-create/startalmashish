@@ -423,6 +423,80 @@ body {
   padding-block: 6px;
 }
 
+/* Yuborilgan takliflar kartasi */
+.sent-offer-item {
+  border-radius: 16px;
+  border: 1px solid #333333;
+  background: #141414;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.sent-offer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.sent-offer-name {
+  font-weight: 600;
+}
+
+.sent-offer-username {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.sent-offer-body {
+  margin-top: 6px;
+}
+
+.sent-offer-link-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-bottom: 2px;
+}
+
+.sent-offer-link-btn {
+  width: 100%;
+  font-size: 0.8rem;
+  padding-block: 6px;
+}
+
+.sent-offer-meta,
+.sent-offer-status {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.sent-offer-footer {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sent-offer-status {
+  text-align: right;
+}
+
+.sent-offer-meta {
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* Chat kartasi sherik matni */
+.chat-partner-name {
+  font-weight: 600;
+}
+
+.chat-partner-username {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
 /* Bosh sahifa mini profil */
 #home-mini-profile {
   display: flex;

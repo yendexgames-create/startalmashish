@@ -224,6 +224,7 @@
   const exchangeChatName = document.getElementById('exchange-chat-name');
   const exchangeChatUsername = document.getElementById('exchange-chat-username');
   const exchangeChatLink = document.getElementById('exchange-chat-link');
+  const exchangeChatClose = document.getElementById('exchange-chat-close');
   const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
@@ -1115,6 +1116,25 @@
   if (exchangeOpenBotBtn) {
     exchangeOpenBotBtn.addEventListener('click', () => {
       openCurrentBotLink();
+    });
+  }
+
+  // Chatni yopish – vaqtinchalik tugma
+  if (exchangeChatClose) {
+    exchangeChatClose.addEventListener('click', async () => {
+      if (exchangeChatCard) {
+        exchangeChatCard.style.display = 'none';
+      }
+
+      // Asosiy almashish kartalarini qayta ko'rsatamiz
+      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+      if (exchangeCard) exchangeCard.style.display = 'none';
+
+      if (currentTelegramId) {
+        // Takliflar va yuborilgan takliflarni yangilab olamiz
+        await loadExchangeOffers(currentTelegramId);
+        await loadSentExchanges(currentTelegramId);
+      }
     });
   }
 
