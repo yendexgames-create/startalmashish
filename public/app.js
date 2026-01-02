@@ -1686,11 +1686,18 @@
             return;
           }
 
-          const url = data.referral_link;
+          const refUrl = data.referral_link;
+          const text = 'Bu botga shu referal link orqali kiring:';
+          const shareUrl =
+            'https://t.me/share/url?url=' +
+            encodeURIComponent(refUrl) +
+            '&text=' +
+            encodeURIComponent(text + '\n' + refUrl);
+
           if (tg && typeof tg.openTelegramLink === 'function') {
-            tg.openTelegramLink(url);
+            tg.openTelegramLink(shareUrl);
           } else {
-            window.open(url, '_blank');
+            window.open(shareUrl, '_blank');
           }
         })
         .catch((e) => {
