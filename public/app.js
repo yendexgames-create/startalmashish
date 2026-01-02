@@ -1233,16 +1233,30 @@
   // Chatni yopish – vaqtinchalik tugma
   if (exchangeChatClose) {
     exchangeChatClose.addEventListener('click', async () => {
-      if (exchangeChatCard) {
-        exchangeChatCard.style.display = 'none';
-      }
-
-      // Asosiy almashish kartalarini qayta ko'rsatamiz
-      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
-      if (exchangeCard) exchangeCard.style.display = 'none';
-
-      // Ushbu almashish bo'yicha chatni yopganimizni eslab qolamiz
+      // Avval backendga chat yopilgani haqida xabar beramiz
       if (currentTelegramId && currentChatExchangeId) {
+        try {
+          const resp = await fetch('/api/exchange/close_chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              exchange_id: currentChatExchangeId
+            })
+          });
+
+          const data = await resp.json().catch(() => null);
+          if (!resp.ok || !data || !data.ok) {
+            const msg = (data && data.error) || 'Chatni yopishda xatolik yuz berdi.';
+            if (tg) tg.showAlert(msg);
+          }
+        } catch (e) {
+          console.error('/api/exchange/close_chat xato:', e);
+        }
+
+        // Mahalliy flag – shu chatni avtomatik qayta ochmaslik uchun
         const key = `chat_closed_${currentTelegramId}_${currentChatExchangeId}`;
         try {
           window.localStorage.setItem(key, '1');
@@ -1250,6 +1264,14 @@
           // ignore storage errors
         }
       }
+
+      if (exchangeChatCard) {
+        exchangeChatCard.style.display = 'none';
+      }
+
+      // Asosiy almashish kartalarini qayta ko'rsatamiz
+      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+      if (exchangeCard) exchangeCard.style.display = 'none';
 
       if (currentTelegramId) {
         // Takliflar va yuborilgan takliflarni yangilab olamiz

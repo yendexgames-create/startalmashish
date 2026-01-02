@@ -264,6 +264,48 @@ app.get('/api/exchange/active_chat', async (req, res) => {
   }
 });
 
+// Chatni yopish: ready_chat holatidagi almashishni yakunlangan deb belgilash
+app.post('/api/exchange/close_chat', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+
+    if (!userId || !exId) {
+      return res.status(400).json({ error: 'telegram_id va exchange_id body da kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    // Faqat shu almashuv ishtirokchilari va faqat ready_chat bo'lsa yopish mumkin
+    if ((ex.user1_id !== userId && ex.user2_id !== userId) || ex.status !== 'ready_chat') {
+      return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi yoki chat holatida emas' });
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('/api/exchange/close_chat xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // WebApp'dan "Bor" bosilganda almashishni yaratish va user2 ga xabar yuborish
 app.post('/api/exchange/create', async (req, res) => {
   try {
