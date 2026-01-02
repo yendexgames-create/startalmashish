@@ -38,6 +38,19 @@ function findUserByTelegramId(telegramId) {
   });
 }
 
+let cachedBotUsername = null;
+async function getBotUsername() {
+  if (cachedBotUsername) return cachedBotUsername;
+  try {
+    const me = await bot.telegram.getMe();
+    cachedBotUsername = me && me.username ? me.username : null;
+  } catch (e) {
+    console.error('getBotUsername xato:', e);
+    cachedBotUsername = null;
+  }
+  return cachedBotUsername;
+}
+
 function createExchangeRow(user1Id, user2Id) {
   const now = Date.now();
   const deadline = now + 48 * 60 * 60 * 1000; // 48 soat
@@ -109,7 +122,7 @@ app.get('/api/me', async (req, res) => {
     }
 
     const invited = user.invited_friends_count || 0;
-    const effectiveSlots = Math.min(1 + Math.floor(invited / 5), 3);
+    const effectiveSlots = Math.min(1 + invited, 3);
 
     return res.json({
       user: {
@@ -666,6 +679,32 @@ app.get('/api/friends', async (req, res) => {
     return res.json({ friends });
   } catch (e) {
     console.error('/api/friends xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Referal linkni qaytarish (WebApp uchun)
+app.get('/api/referral_link', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    const botUsername = await getBotUsername();
+    if (!botUsername) {
+      return res.status(500).json({ error: 'Bot username topilmadi' });
+    }
+
+    const referralLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
+    return res.json({ referral_link: referralLink });
+  } catch (e) {
+    console.error('/api/referral_link xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });

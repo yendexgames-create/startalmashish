@@ -217,6 +217,11 @@
   const exchangeOffersCard = document.getElementById('exchange-offers-card');
   const exchangeOffersEmpty = document.getElementById('exchange-offers-empty');
   const exchangeOffersList = document.getElementById('exchange-offers-list');
+  const exchangeSlotCard = document.getElementById('exchange-slot-card');
+  const exchangeSlotList = document.getElementById('exchange-slot-list');
+  const exchangeSlotCancel = document.getElementById('exchange-slot-cancel');
+  const exchangeNoCandidateCard = document.getElementById('exchange-no-candidate-card');
+  const exchangeNoCandidateBack = document.getElementById('exchange-no-candidate-back');
   const exchangeSentCard = document.getElementById('exchange-sent-card');
   const exchangeSentEmpty = document.getElementById('exchange-sent-empty');
   const exchangeSentList = document.getElementById('exchange-sent-list');
@@ -249,12 +254,23 @@
   let currentChatExchangeId = null;
   let chatLastMessageId = 0;
   let chatPollInterval = null;
+  let currentSlotsData = null;
+  let currentSelectedSlotIndex = 1;
 
   function hideExchangeCards() {
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
     if (exchangeCard) exchangeCard.style.display = 'none';
+    if (exchangeSlotCard) exchangeSlotCard.style.display = 'none';
+    if (exchangeNoCandidateCard) exchangeNoCandidateCard.style.display = 'none';
     if (exchangeOffersCard) exchangeOffersCard.style.display = 'none';
     if (exchangeSentCard) exchangeSentCard.style.display = 'none';
+  }
+
+  function showHeroCard() {
+    if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+    if (exchangeCard) exchangeCard.style.display = 'none';
+    if (exchangeSlotCard) exchangeSlotCard.style.display = 'none';
+    if (exchangeNoCandidateCard) exchangeNoCandidateCard.style.display = 'none';
   }
 
   function showExchangeChat(partner, exchangeId) {
@@ -734,6 +750,7 @@
       const meData = await meRes.json();
 
       const slotsData = slotsRes.ok ? await slotsRes.json() : null;
+      currentSlotsData = slotsData || null;
       const friendsData = friendsRes.ok ? await friendsRes.json() : { friends: [] };
       const activeChatData = activeChatRes.ok ? await activeChatRes.json() : { active: null };
 
@@ -810,7 +827,7 @@
       }
       if (tileRefInfo) {
         const invited = meData.user.invited_friends_count || 0;
-        tileRefInfo.textContent = `${invited} / 5`;
+        tileRefInfo.textContent = `${invited} ta do‘st`; 
       }
       if (tileStatsInfo) {
         const totalEx = meData.user.total_exchanges || 0;
@@ -960,8 +977,8 @@
     const currentLink = slot1?.link || '';
     const currentDesc = slot1?.description || '';
 
-    const lockedText2 = totalSlots >= 2 ? '' : ' (5 ta do‘stdan keyin ochiladi)';
-    const lockedText3 = totalSlots >= 3 ? '' : ' (qo‘shimcha takliflardan keyin ochiladi)';
+    const lockedText2 = totalSlots >= 2 ? '' : ' (1 ta do‘st taklif qilgandan keyin ochiladi)';
+    const lockedText3 = totalSlots >= 3 ? '' : ' (2 ta do‘st taklif qilgandan keyin ochiladi)';
 
     slotsDiv.innerHTML = `
       <div class="slot-card slot-card--active">
@@ -1134,58 +1151,120 @@
     exchangeCard.classList.add('exchange-card--visible');
   }
 
-  // --- Tugmalar uchun handlerlar ---
-  if (btnStartExchange) {
-    btnStartExchange.addEventListener('click', async () => {
-      // Avval backenddan real kandidatni so'rab olamiz
-      if (!currentTelegramId) {
-        if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+  function showNoCandidateCard() {
+    hideExchangeCards();
+    if (exchangeNoCandidateCard) {
+      exchangeNoCandidateCard.style.display = 'block';
+      exchangeNoCandidateCard.classList.remove('exchange-slide-out-left', 'exchange-slide-in-right');
+      exchangeNoCandidateCard.classList.add('exchange-slide-in-right');
+      setTimeout(() => {
+        exchangeNoCandidateCard.classList.remove('exchange-slide-in-right');
+      }, 230);
+    }
+  }
+
+  async function startExchangeFlow() {
+    if (!currentTelegramId) {
+      if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
+      if (!resp.ok) {
+        if (tg) tg.showAlert('Kandidatni yuklashda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
         return;
       }
 
-      try {
-        const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          const c = data && data.candidate ? data.candidate : null;
+      const data = await resp.json();
+      const c = data && data.candidate ? data.candidate : null;
 
-          if (!c) {
-            if (tg) {
-              tg.showAlert(
-                'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.'
-              );
-            }
-            return;
-          }
-
-          currentExchangeCandidate = {
-            telegramId: c.telegram_id,
-            name: c.name || 'Foydalanuvchi',
-            username: c.username || '',
-            profileLink: c.profile_link || '',
-            botUrl: c.main_link || '',
-            description: c.description || ''
-          };
-        } else {
-          if (tg) tg.showAlert('Kandidatni yuklashda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
-          return;
-        }
-      } catch (e) {
-        console.error('exchange/match fetch xato:', e);
-        if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+      if (!c) {
+        showNoCandidateCard();
         return;
       }
 
-      // Hero cardni yashiramiz, almashish kartasini esa real kandidat bilan ko'rsatamiz
+      currentExchangeCandidate = {
+        telegramId: c.telegram_id,
+        name: c.name || 'Foydalanuvchi',
+        username: c.username || '',
+        profileLink: c.profile_link || '',
+        botUrl: c.main_link || '',
+        description: c.description || ''
+      };
+
       if (exchangeHeroCard) {
         exchangeHeroCard.style.display = 'none';
       }
 
       if (exchangeCard) {
         exchangeCard.style.display = 'block';
+        exchangeCard.classList.remove('exchange-slide-out-left', 'exchange-slide-in-right');
+        exchangeCard.classList.add('exchange-slide-in-right');
+        setTimeout(() => {
+          exchangeCard.classList.remove('exchange-slide-in-right');
+        }, 230);
       }
 
       fillExchangeCardFromCandidate();
+    } catch (e) {
+      console.error('exchange/match fetch xato:', e);
+      if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+    }
+  }
+
+  function renderExchangeSlotSelection() {
+    if (!exchangeSlotCard || !exchangeSlotList) {
+      startExchangeFlow();
+      return;
+    }
+
+    const links = currentSlotsData && Array.isArray(currentSlotsData.links) ? currentSlotsData.links : [];
+    const openSlots = links.filter((l) => l.link);
+
+    if (!openSlots.length || openSlots.length === 1) {
+      currentSelectedSlotIndex = openSlots[0]?.slot_index || 1;
+      startExchangeFlow();
+      return;
+    }
+
+    exchangeSlotList.innerHTML = '';
+
+    openSlots.forEach((s) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'primary-btn exchange-slot-btn';
+      btn.textContent = `${s.slot_index}-slot: ${s.link}`;
+      btn.addEventListener('click', () => {
+        currentSelectedSlotIndex = s.slot_index;
+        if (exchangeSlotCard) exchangeSlotCard.style.display = 'none';
+        startExchangeFlow();
+      });
+      exchangeSlotList.appendChild(btn);
+    });
+
+    if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
+    if (exchangeCard) exchangeCard.style.display = 'none';
+    if (exchangeNoCandidateCard) exchangeNoCandidateCard.style.display = 'none';
+    exchangeSlotCard.style.display = 'block';
+  }
+
+  // --- Tugmalar uchun handlerlar ---
+  if (btnStartExchange) {
+    btnStartExchange.addEventListener('click', () => {
+      renderExchangeSlotSelection();
+    });
+  }
+
+  if (exchangeSlotCancel) {
+    exchangeSlotCancel.addEventListener('click', () => {
+      showHeroCard();
+    });
+  }
+
+  if (exchangeNoCandidateBack) {
+    exchangeNoCandidateBack.addEventListener('click', () => {
+      showHeroCard();
     });
   }
 
@@ -1266,7 +1345,20 @@
             description: c.description || ''
           };
 
-          fillExchangeCardFromCandidate();
+          if (exchangeCard) {
+            exchangeCard.classList.remove('exchange-slide-out-left', 'exchange-slide-in-right');
+            exchangeCard.classList.add('exchange-slide-out-left');
+            setTimeout(() => {
+              exchangeCard.classList.remove('exchange-slide-out-left');
+              fillExchangeCardFromCandidate();
+              exchangeCard.classList.add('exchange-slide-in-right');
+              setTimeout(() => {
+                exchangeCard.classList.remove('exchange-slide-in-right');
+              }, 230);
+            }, 180);
+          } else {
+            fillExchangeCardFromCandidate();
+          }
         } else {
           if (tg) tg.showAlert('Kandidatni yuklashda xatolik yuz berdi. Keyinroq urinib ko‘ring.');
         }
@@ -1567,15 +1659,28 @@
 
   if (btnShareRef) {
     btnShareRef.addEventListener('click', () => {
-      if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-        // Hozircha faqat tushuntirish popup, keyin backend orqali haqiqiy referal linkni olamiz
-        tg.showPopup({
-          title: "Do'st taklif qilish",
-          message:
-            "Referal linkingizni bot ichidagi '👥 Doʼst taklif qilish' menyusidan olishingiz mumkin. Bu yerda keyinchalik uni koʼrib va ulashishingiz ham mumkin boʼladi.",
-          buttons: [{ id: 'ok', type: 'close', text: 'Yopish' }]
+      if (!tg || !currentTelegramId) return;
+
+      fetch(`/api/referral_link?telegram_id=${currentTelegramId}`)
+        .then((resp) => resp.json().catch(() => null).then((data) => ({ resp, data })))
+        .then(({ resp, data }) => {
+          if (!resp.ok || !data || !data.referral_link) {
+            const msg = (data && data.error) || 'Referal linkni olishda xatolik yuz berdi.';
+            if (tg && tg.showAlert) tg.showAlert(msg);
+            return;
+          }
+
+          const url = data.referral_link;
+          if (tg && typeof tg.openTelegramLink === 'function') {
+            tg.openTelegramLink(url);
+          } else {
+            window.open(url, '_blank');
+          }
+        })
+        .catch((e) => {
+          console.error('/api/referral_link xato:', e);
+          if (tg && tg.showAlert) tg.showAlert('Referal linkni olishda xatolik yuz berdi.');
         });
-      }
     });
   }
 

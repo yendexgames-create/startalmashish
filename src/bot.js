@@ -460,7 +460,7 @@ bot.on('contact', async (ctx) => {
         db.run(
           `UPDATE users
            SET invited_friends_count = invited_friends_count + 1,
-               slots = MIN(1 + 2 * ((invited_friends_count + 1) / 5), 3)
+               slots = MIN(1 + (invited_friends_count + 1), 3)
            WHERE telegram_id = ?`,
           [referrerId],
           (err) => {
@@ -651,7 +651,8 @@ bot.on('text', async (ctx) => {
     const referralLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
 
     let msg = '👥 Do‘st taklif qilish\n\n';
-    msg += 'Quyidagi referal linkingizni do‘stlaringizga yuboring. Ular shu link orqali botga kirib ro‘yxatdan o‘tsa, sizning takliflaringiz soni oshadi.Agar siz 5 tadan oshiq dost taklif qilsangiz siz uchun yangi 2 ta slot ochiladi link qoyish uchun.\n\n';
+    msg +=
+      'Quyidagi referal linkingizni do‘stlaringizga yuboring. Ular shu link orqali botga kirib ro‘yxatdan o‘tsa, sizning takliflaringiz soni oshadi va har bir do‘st uchun bitta qo‘shimcha slot ochiladi (jami 3 tagacha).\n\n';
     msg += `Sizning linkingiz: ${referralLink}`;
 
     await ctx.reply(msg, mainMenuKeyboard());
