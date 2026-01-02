@@ -9,6 +9,17 @@
 
   // Yuborilgan takliflar (Men tayyorman va link) va chat linki uchun listenerlar
 
+  function formatExchangeTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}.${mm} ${hh}:${min}`;
+  }
+
   async function loadSentExchanges(telegramId) {
     if (!exchangeSentCard || !exchangeSentList || !exchangeSentEmpty) return;
 
@@ -42,6 +53,7 @@
         const name = u.name || 'Foydalanuvchi';
         const username = u.username ? `@${u.username}` : '';
         const link = u.main_link || '-';
+        const timeText = formatExchangeTime(item.created_at);
 
         let statusText = 'Kutilmoqda';
         if (item.status === 'accepted_partner') statusText = 'Qabul qilindi';
@@ -55,9 +67,13 @@
         html += '</div>';
 
         html += '<div class="sent-offer-body">';
-        html += '<div class="sent-offer-link-label">Qaysi link uchun:</div>';
+        html += '<div class="sent-offer-link-label">Bu foydalanuvchining linki:</div>';
         html += `<button type="button" class="sent-offer-link-btn" data-url="${link}">${link}</button>`;
         html += '</div>';
+
+        if (timeText) {
+          html += `<div class="sent-offer-meta">Vaqti: ${timeText}</div>`;
+        }
 
         html += '<div class="sent-offer-footer">';
         html += `<div class="sent-offer-status">Holat: ${statusText}</div>`;
@@ -1102,6 +1118,78 @@
     });
   }
 
+  // Yuborilgan takliflar: Men tayyorman va link bosish
+  if (exchangeSentList) {
+    exchangeSentList.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!tg) return;
+
+      const linkEl = target.closest('.sent-offer-link-btn');
+      if (linkEl) {
+        const url = linkEl.getAttribute('data-url');
+        if (url) {
+          if (tg && typeof tg.openTelegramLink === 'function') {
+            tg.openTelegramLink(url);
+          } else {
+            window.open(url, '_blank');
+          }
+        }
+        return;
+      }
+
+      const readyBtn = target.closest('.sent-ready-btn');
+      if (readyBtn) {
+        const exchangeId = readyBtn.getAttribute('data-exchange-id');
+        if (!exchangeId || !currentTelegramId) return;
+
+        fetch('/api/exchange/ready', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
+            exchange_id: exchangeId
+          })
+        })
+          .then((resp) => resp.json().catch(() => null))
+          .then((data) => {
+            if (!data || !data.ok || !data.partner) {
+              const msg = (data && data.error) || 'Holatni yangilashda xatolik yuz berdi.';
+              tg.showAlert(msg);
+              return;
+            }
+
+            tg.showAlert('Siz tayyorligingizni bildirdingiz. Chat Telegram ichida davom etadi.');
+
+            const item = readyBtn.closest('.sent-offer-item');
+            if (item && item.parentElement) {
+              item.parentElement.removeChild(item);
+            }
+
+            showExchangeChat(data.partner, data.exchange_id);
+          })
+          .catch((err) => {
+            console.error('/api/exchange/ready xato:', err);
+            tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+          });
+      }
+    });
+  }
+
+  // Chat kartasidagi link tugmasi
+  if (exchangeChatLink) {
+    exchangeChatLink.addEventListener('click', () => {
+      const url = exchangeChatLink.dataset.url || exchangeChatLink.textContent;
+      if (!url) return;
+      if (tg && typeof tg.openTelegramLink === 'function') {
+        tg.openTelegramLink(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    });
+  }
+
   // Takliflar kartasidagi Bor/Yo'q tugmalari
   if (exchangeOffersList) {
     exchangeOffersList.addEventListener('click', (e) => {
@@ -1143,19 +1231,22 @@
         })
           .then((r) => r.json().catch(() => null))
           .then((data) => {
+            if (!data || !data.ok) {
+              const msg = (data && data.error) ||
+                'Taklifni qabul qilishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
+              tg.showAlert(msg);
+              return;
+            }
+
+            // Muvaffaqiyatli bo'lsa, shu taklif itemini olib tashlaymiz
             const offerItem = acceptBtn.closest('.offer-item');
-            if (offerItem) {
-              const statusEl = offerItem.querySelector('.offer-status');
-              if (statusEl) {
-                if (data && data.ok) {
-                  statusEl.textContent =
-                    'Siz bu taklifga rozilik bildirdingiz. Almashish bo‘yicha keyingi qadamlarni botdan kuzating.';
-                } else {
-                  statusEl.textContent =
-                    (data && data.error) ||
-                    'Taklifni qabul qilishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
-                }
-              }
+            if (offerItem && offerItem.parentElement) {
+              offerItem.parentElement.removeChild(offerItem);
+            }
+
+            // Agar boshqa offer qolmagan bo'lsa, kartani yashiramiz
+            if (exchangeOffersList && !exchangeOffersList.querySelector('.offer-item')) {
+              if (exchangeOffersCard) exchangeOffersCard.style.display = 'none';
             }
           })
           .catch((err) => {
@@ -1183,18 +1274,20 @@
         })
           .then((r) => r.json().catch(() => null))
           .then((data) => {
+            if (!data || !data.ok) {
+              const msg = (data && data.error) ||
+                'Taklifni rad etishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
+              tg.showAlert(msg);
+              return;
+            }
+
             const offerItem = rejectBtn.closest('.offer-item');
-            if (offerItem) {
-              const statusEl = offerItem.querySelector('.offer-status');
-              if (statusEl) {
-                if (data && data.ok) {
-                  statusEl.textContent = 'Siz bu almashish taklifini rad etdingiz.';
-                } else {
-                  statusEl.textContent =
-                    (data && data.error) ||
-                    'Taklifni rad etishda xatolik yuz berdi. Keyinroq qayta urinib ko‘ring.';
-                }
-              }
+            if (offerItem && offerItem.parentElement) {
+              offerItem.parentElement.removeChild(offerItem);
+            }
+
+            if (exchangeOffersList && !exchangeOffersList.querySelector('.offer-item')) {
+              if (exchangeOffersCard) exchangeOffersCard.style.display = 'none';
             }
           })
           .catch((err) => {
