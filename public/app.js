@@ -1659,7 +1659,23 @@
 
   if (btnShareRef) {
     btnShareRef.addEventListener('click', () => {
-      if (!tg || !currentTelegramId) return;
+      if (!tg) {
+        alert('Do\'st taklif qilish uchun ilovani Telegram ichidagi "🧩 Web ilova" tugmasi orqali oching.');
+        return;
+      }
+
+      if (!currentTelegramId && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+        currentTelegramId = tg.initDataUnsafe.user.id;
+      }
+
+      if (!currentTelegramId) {
+        if (tg.showAlert) {
+          tg.showAlert(
+            'Foydalanuvchi ID topilmadi. Iltimos, Web ilovani bot ichidagi "🧩 Web ilova" tugmasi orqali qayta oching.'
+          );
+        }
+        return;
+      }
 
       fetch(`/api/referral_link?telegram_id=${currentTelegramId}`)
         .then((resp) => resp.json().catch(() => null).then((data) => ({ resp, data })))
