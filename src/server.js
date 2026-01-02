@@ -651,7 +651,7 @@ app.get('/api/exchange/sent', async (req, res) => {
                 u.description as user2_description
          FROM exchanges e
          JOIN users u ON e.user2_id = u.telegram_id
-         WHERE e.user1_id = ?
+         WHERE e.user1_id = ? AND e.status IN ('pending_partner', 'accepted_partner')
          ORDER BY e.created_at DESC`,
         [telegramId],
         (err, r) => {
