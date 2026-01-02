@@ -1086,6 +1086,10 @@
         exchangeHeroCard.style.display = 'none';
       }
 
+      if (exchangeCard) {
+        exchangeCard.style.display = 'block';
+      }
+
       fillExchangeCardFromCandidate();
     });
   }
