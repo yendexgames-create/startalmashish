@@ -590,26 +590,63 @@
     }
   }
 
-  // Akkaunt soni bo'yicha kelishish – faqat UI darajasida
+  // Akkaunt soni bo'yicha kelishish – backend bilan
   if (chatAccountsSubmit && chatAccountsSelect && exchangeChatMessages) {
-    chatAccountsSubmit.addEventListener('click', () => {
+    chatAccountsSubmit.addEventListener('click', async () => {
+      if (!currentTelegramId || !currentChatExchangeId) return;
+
       const myVal = parseInt(chatAccountsSelect.value, 10) || 1;
 
-      // Hozircha sherikdagi akkaunt soni sifatida 1 ni qabul qilamiz
-      const partnerAccounts = 1;
-      const minAccounts = Math.min(myVal, partnerAccounts);
+      try {
+        const resp = await fetch('/api/exchange/accounts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
+            exchange_id: currentChatExchangeId,
+            count: myVal
+          })
+        });
 
-      const msg = document.createElement('div');
-      msg.className = 'chat-message chat-message-system';
-      msg.innerHTML =
-        `<div>Siz bu bot uchun <b>${myVal}</b> ta akkaunt bor deb tanladingiz.</div>
-         <div style="margin-top:4px;">Sherigingizda hozircha <b>${partnerAccounts}</b> ta akkaunt bor deb hisoblanadi.</div>
-         <div style="margin-top:6px;">Shuning uchun har ikkala tomondan <b>${minAccounts}</b> tadan start olinadi.</div>`;
+        const data = await resp.json().catch(() => null);
 
-      exchangeChatMessages.appendChild(msg);
+        if (!resp.ok || !data || !data.ok) {
+          const msgText = (data && data.error) || 'Akkaunt sonini saqlashda xatolik yuz berdi.';
+          if (tg) tg.showAlert(msgText);
+          return;
+        }
 
-      if (exchangeChatMessages.scrollHeight) {
-        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+        const msg = document.createElement('div');
+        msg.className = 'chat-message chat-message-system';
+
+        if (data.state === 'waiting_other') {
+          msg.innerHTML =
+            `<div>Siz bu bot uchun <b>${myVal}</b> ta akkaunt bor deb tanladingiz.</div>
+             <div style="margin-top:4px;">Endi sherigingiz ham nechta akkaunti borligini belgilashi kerak.</div>
+             <div style="margin-top:4px;">Iltimos, kutib turing – sherigingiz sonni kiritgandan so'ng umumiy kelishilgan son ko'rsatiladi.</div>`;
+        } else if (data.state === 'both_set') {
+          const myCount = data.my_count;
+          const otherCount = data.other_count;
+          const minAccounts = data.min_accounts;
+
+          msg.innerHTML =
+            `<div>Siz: <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
+             <div>Sherigingiz: <b>${otherCount}</b> ta akkaunt deb tanladi.</div>
+             <div style="margin-top:6px;">Adolatli bo'lishi uchun eng kichik son olinadi: <b>${minAccounts}</b> tadan start qilinadi.</div>`;
+        } else {
+          msg.textContent = 'Akkaunt soni yangilandi.';
+        }
+
+        exchangeChatMessages.appendChild(msg);
+
+        if (exchangeChatMessages.scrollHeight) {
+          exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+        }
+      } catch (e) {
+        console.error('/api/exchange/accounts xato:', e);
+        if (tg) tg.showAlert('Akkaunt sonini saqlashda xatolik yuz berdi.');
       }
     });
   }
@@ -1416,6 +1453,16 @@
       });
       exchangeSlotList.appendChild(btn);
     });
+
+    // Agar boshqa slotlar bo'sh bo'lsa, foydalanuvchiga ularni to'ldirish haqida eslatma beramiz
+    const filledIndexes = openSlots.map((s) => s.slot_index);
+    const emptyIndexes = [1, 2, 3].filter((idx) => !filledIndexes.includes(idx));
+    if (emptyIndexes.length) {
+      const hint = document.createElement('div');
+      hint.className = 'hint-text';
+      hint.textContent = 'Bo‘sh slotlar uchun profil bo‘limidan link qo‘shing (slotni to‘ldiring).';
+      exchangeSlotList.appendChild(hint);
+    }
 
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
     if (exchangeCard) exchangeCard.style.display = 'none';

@@ -144,6 +144,99 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// WebApp ichida akkaunt soni bo'yicha kelishish
+app.post('/api/exchange/accounts', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id, count } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+    const accCount = parseInt(count, 10);
+
+    if (!userId || !exId || !accCount || accCount <= 0) {
+      return res.status(400).json({ error: 'telegram_id, exchange_id va count body da kerak' });
+    }
+
+    const user = await findUserByTelegramId(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    if (ex.user1_id !== userId && ex.user2_id !== userId) {
+      return res.status(403).json({ error: 'Bu almashishga siz bog\'liq emassiz' });
+    }
+
+    const isUser1 = ex.user1_id === userId;
+    const myField = isUser1 ? 'accounts_user1' : 'accounts_user2';
+    const otherField = isUser1 ? 'accounts_user2' : 'accounts_user1';
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE exchanges SET ${myField} = ? WHERE id = ?`,
+        [accCount, exId],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
+    const updated = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    const myCount = accCount;
+    const otherCount = updated && typeof updated[otherField] === 'number' ? updated[otherField] : null;
+
+    if (!otherCount) {
+      // Hozircha faqat siz kiritdingiz, sherik hali kiritmagan
+      return res.json({
+        ok: true,
+        state: 'waiting_other',
+        my_count: myCount
+      });
+    }
+
+    const min = Math.min(myCount, otherCount);
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE exchanges SET status = ?, deadline = ? WHERE id = ?',
+        ['waiting_screenshots', Date.now() + 24 * 60 * 60 * 1000, exId],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
+    return res.json({
+      ok: true,
+      state: 'both_set',
+      my_count: myCount,
+      other_count: otherCount,
+      min_accounts: min
+    });
+  } catch (e) {
+    console.error('/api/exchange/accounts xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // Chat xabarini yuborish
 app.post('/api/exchange/messages', async (req, res) => {
   try {

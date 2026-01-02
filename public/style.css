@@ -272,6 +272,10 @@ body {
   display: block;
 }
 
+.exchange-slot-btn {
+  margin-bottom: 8px;
+}
+
 .exchange-user {
   display: flex;
   align-items: center;
@@ -573,7 +577,7 @@ body {
   border-radius: 14px;
   background: #050505;
   padding: 8px 8px 10px;
-  max-height: 420px;
+  max-height: 520px;
   display: flex;
   flex-direction: column;
 }
@@ -599,14 +603,14 @@ body {
 }
 
 .chat-message-self {
-  align-self: flex-end;
+  align-self: flex-start;
   background: #1f2937;
   border-radius: 10px;
   padding: 6px 8px;
 }
 
 .chat-message-partner {
-  align-self: flex-start;
+  align-self: flex-end;
   background: #08101f;
   border-radius: 10px;
   padding: 6px 8px;
