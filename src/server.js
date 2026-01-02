@@ -131,6 +131,116 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// Chat xabarini yuborish
+app.post('/api/exchange/messages', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id, text } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+    const msgText = typeof text === 'string' ? text.trim() : '';
+
+    if (!userId || !exId || !msgText) {
+      return res.status(400).json({ error: 'telegram_id, exchange_id va text body da kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    // Faqat ishtirokchilar va faqat ready_chat holatida xabar yuborishi mumkin
+    if (ex.status !== 'ready_chat' || (ex.user1_id !== userId && ex.user2_id !== userId)) {
+      return res.status(400).json({ error: 'Bu almashish uchun chat ruxsat etilmagan' });
+    }
+
+    const now = Date.now();
+
+    const insertedId = await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
+        [exId, userId, msgText, now],
+        function (err) {
+          if (err) return reject(err);
+          resolve(this.lastID);
+        }
+      );
+    });
+
+    return res.json({
+      ok: true,
+      message: {
+        id: insertedId,
+        exchange_id: exId,
+        from_telegram_id: userId,
+        text: msgText,
+        created_at: now
+      }
+    });
+  } catch (e) {
+    console.error('/api/exchange/messages POST xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// Chat xabarlarini olish
+app.get('/api/exchange/messages', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    const exId = parseInt(req.query.exchange_id, 10);
+    const afterId = req.query.after_id ? parseInt(req.query.after_id, 10) : 0;
+
+    if (!telegramId || !exId) {
+      return res.status(400).json({ error: 'telegram_id va exchange_id query paramlarda kerak' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    // Faqat ishtirokchilar o'qishi mumkin
+    if (ex.user1_id !== telegramId && ex.user2_id !== telegramId) {
+      return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi' });
+    }
+
+    const params = [exId];
+    let sql =
+      'SELECT id, exchange_id, from_telegram_id, text, created_at FROM exchange_messages WHERE exchange_id = ?';
+
+    if (afterId && afterId > 0) {
+      sql += ' AND id > ?';
+      params.push(afterId);
+    }
+
+    sql += ' ORDER BY id ASC LIMIT 100';
+
+    const rows = await new Promise((resolve, reject) => {
+      db.all(sql, params, (err, r) => {
+        if (err) return reject(err);
+        resolve(r || []);
+      });
+    });
+
+    return res.json({ messages: rows });
+  } catch (e) {
+    console.error('/api/exchange/messages GET xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // "Men tayyorman" bosilganda almashishni chatga tayyor deb belgilash
 app.post('/api/exchange/ready', async (req, res) => {
   try {

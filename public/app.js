@@ -247,6 +247,8 @@
   let currentExchangeCandidate = null;
   let hasExchangeCandidates = false;
   let currentChatExchangeId = null;
+  let chatLastMessageId = 0;
+  let chatPollInterval = null;
 
   function hideExchangeCards() {
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
@@ -292,6 +294,18 @@
 
     if (exchangeChatCard) {
       exchangeChatCard.style.display = 'block';
+    }
+
+    // Eski chat xabarlarini yuklaymiz
+    if (currentTelegramId && currentChatExchangeId) {
+      loadChatMessages(false);
+
+      if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+      }
+      chatPollInterval = setInterval(() => {
+        loadChatMessages(true);
+      }, 2500);
     }
   }
 
@@ -522,6 +536,40 @@
     });
   }
 
+  async function loadChatMessages(onlyNew) {
+    if (!currentTelegramId || !currentChatExchangeId || !exchangeChatMessages) return;
+
+    const params = new URLSearchParams();
+    params.set('telegram_id', currentTelegramId);
+    params.set('exchange_id', currentChatExchangeId);
+    if (onlyNew && chatLastMessageId > 0) {
+      params.set('after_id', chatLastMessageId);
+    }
+
+    try {
+      const resp = await fetch(`/api/exchange/messages?${params.toString()}`);
+      if (!resp.ok) return;
+      const data = await resp.json().catch(() => null);
+      if (!data || !Array.isArray(data.messages) || !data.messages.length) return;
+
+      data.messages.forEach((m) => {
+        const fromId = m.from_telegram_id;
+        const text = m.text || '';
+        if (!text) return;
+        if (fromId === currentTelegramId) {
+          appendSelfChatMessage(text);
+        } else {
+          appendPartnerChatMessage(text);
+        }
+        if (typeof m.id === 'number' && m.id > chatLastMessageId) {
+          chatLastMessageId = m.id;
+        }
+      });
+    } catch (e) {
+      console.error('Chat xabarlarini yuklashda xato:', e);
+    }
+  }
+
   // Akkaunt soni bo'yicha kelishish – faqat UI darajasida
   if (chatAccountsSubmit && chatAccountsSelect && exchangeChatMessages) {
     chatAccountsSubmit.addEventListener('click', () => {
@@ -546,29 +594,76 @@
     });
   }
 
-  // Oddiy chat xabarlari – faqat UI darajasida
+  // Oddiy chat xabarlari – backend bilan
   if (chatMessageSend && chatMessageInput) {
-    chatMessageSend.addEventListener('click', () => {
-      const val = chatMessageInput.value || '';
+    chatMessageSend.addEventListener('click', async () => {
+      const val = (chatMessageInput.value || '').trim();
+      if (!val || !currentTelegramId || !currentChatExchangeId) return;
+
       appendSelfChatMessage(val);
       chatMessageInput.value = '';
 
-      // Kichik kechikish bilan sherikdan soxta javob
-      setTimeout(() => {
-        appendPartnerChatMessage('Yaxshi, davom etamiz.');
-      }, 800 + Math.random() * 700);
+      try {
+        const resp = await fetch('/api/exchange/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
+            exchange_id: currentChatExchangeId,
+            text: val
+          })
+        });
+
+        const data = await resp.json().catch(() => null);
+        if (resp.ok && data && data.message && typeof data.message.id === 'number') {
+          if (data.message.id > chatLastMessageId) {
+            chatLastMessageId = data.message.id;
+          }
+        } else if (!resp.ok && tg) {
+          const msg = (data && data.error) || 'Xabar yuborishda xatolik yuz berdi.';
+          tg.showAlert(msg);
+        }
+      } catch (e) {
+        console.error('/api/exchange/messages POST xato:', e);
+      }
     });
 
     chatMessageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const val = chatMessageInput.value || '';
+        const val = (chatMessageInput.value || '').trim();
+        if (!val || !currentTelegramId || !currentChatExchangeId) return;
+
         appendSelfChatMessage(val);
         chatMessageInput.value = '';
 
-        setTimeout(() => {
-          appendPartnerChatMessage('Tushundim, rahmat.');
-        }, 800 + Math.random() * 700);
+        fetch('/api/exchange/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            telegram_id: currentTelegramId,
+            exchange_id: currentChatExchangeId,
+            text: val
+          })
+        })
+          .then((resp) => resp.json().catch(() => null).then((data) => ({ resp, data })))
+          .then(({ resp, data }) => {
+            if (resp.ok && data && data.message && typeof data.message.id === 'number') {
+              if (data.message.id > chatLastMessageId) {
+                chatLastMessageId = data.message.id;
+              }
+            } else if (!resp.ok && tg) {
+              const msg = (data && data.error) || 'Xabar yuborishda xatolik yuz berdi.';
+              tg.showAlert(msg);
+            }
+          })
+          .catch((err) => {
+            console.error('/api/exchange/messages POST xato (enter):', err);
+          });
       }
     });
   }
@@ -1237,6 +1332,11 @@
   // Chatni yopish – vaqtinchalik tugma
   if (exchangeChatClose) {
     exchangeChatClose.addEventListener('click', async () => {
+      if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+        chatPollInterval = null;
+      }
+
       // Avval backendga chat yopilgani haqida xabar beramiz
       if (currentTelegramId && currentChatExchangeId) {
         try {

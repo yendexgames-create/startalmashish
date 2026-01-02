@@ -74,6 +74,14 @@ export function initDb() {
       user2_approved INTEGER DEFAULT 0
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS exchange_messages (
+      id INTEGER PRIMARY KEY,
+      exchange_id INTEGER,
+      from_telegram_id INTEGER,
+      text TEXT,
+      created_at INTEGER
+    )`);
+
     db.run(`CREATE TABLE IF NOT EXISTS exchange_screenshots (
       id INTEGER PRIMARY KEY,
       exchange_id INTEGER,
