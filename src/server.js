@@ -213,10 +213,12 @@ app.post('/api/exchange/accounts', async (req, res) => {
 
     const min = Math.min(myCount, otherCount);
 
+    const deadlineTs = Date.now() + 24 * 60 * 60 * 1000;
+
     await new Promise((resolve, reject) => {
       db.run(
         'UPDATE exchanges SET status = ?, deadline = ? WHERE id = ?',
-        ['waiting_screenshots', Date.now() + 24 * 60 * 60 * 1000, exId],
+        ['waiting_screenshots', deadlineTs, exId],
         (err) => {
           if (err) return reject(err);
           resolve();
@@ -229,7 +231,8 @@ app.post('/api/exchange/accounts', async (req, res) => {
       state: 'both_set',
       my_count: myCount,
       other_count: otherCount,
-      min_accounts: min
+      min_accounts: min,
+      deadline_ts: deadlineTs
     });
   } catch (e) {
     console.error('/api/exchange/accounts xato:', e);

@@ -234,6 +234,7 @@
   const exchangeChatName = document.getElementById('exchange-chat-name');
   const exchangeChatUsername = document.getElementById('exchange-chat-username');
   const exchangeChatLink = document.getElementById('exchange-chat-link');
+  const exchangeChatTimer = document.getElementById('exchange-chat-timer');
   const exchangeChatClose = document.getElementById('exchange-chat-close');
   const exchangeChatMessages = document.getElementById('exchange-chat-messages');
   const chatAccountsArea = document.getElementById('exchange-chat-accounts-area');
@@ -258,6 +259,7 @@
   let currentChatExchangeId = null;
   let chatLastMessageId = 0;
   let chatPollInterval = null;
+  let chatTimerInterval = null;
   let currentSlotsData = null;
   let currentSelectedSlotIndex = 1;
 
@@ -310,6 +312,11 @@
          <div style="margin-top:4px;">Sherigingizning linki: <span style="word-break:break-all;">${linkText}</span></div>
          <div style="margin-top:6px;">Quyida bu bot uchun nechta akkauntingiz borligini tanlang.</div>`;
       exchangeChatMessages.appendChild(firstMsg);
+    }
+
+    // Timer matnini tozalab qo'yamiz
+    if (exchangeChatTimer) {
+      exchangeChatTimer.textContent = '';
     }
 
     if (exchangeChatCard) {
@@ -635,6 +642,44 @@
             `<div>Siz: <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
              <div>Sherigingiz: <b>${otherCount}</b> ta akkaunt deb tanladi.</div>
              <div style="margin-top:6px;">Adolatli bo'lishi uchun eng kichik son olinadi: <b>${minAccounts}</b> tadan start qilinadi.</div>`;
+
+          // 24 soatlik timer va qoida matni
+          if (exchangeChatTimer && typeof data.deadline_ts === 'number') {
+            const deadline = data.deadline_ts;
+
+            const ruleText =
+              '24 soat ichida ikkala tomon ham start bosib, screenshot yuborishi kerak. Agar bir tomon bajarib, ' +
+              'ikkinchi tomon 24 soat ichida bajarmasa, avval 1-ogsʻhlantirish (1 hafta blok), ikkinchi marta esa umrbod blok qoʻllanadi.';
+
+            function updateTimer() {
+              const now = Date.now();
+              const diff = deadline - now;
+
+              if (diff <= 0) {
+                exchangeChatTimer.textContent = 'Vaqt tugadi. Endi natija bo‘yicha qaror chiqariladi.';
+                if (chatTimerInterval) {
+                  clearInterval(chatTimerInterval);
+                  chatTimerInterval = null;
+                }
+                return;
+              }
+
+              const totalSeconds = Math.floor(diff / 1000);
+              const hours = Math.floor(totalSeconds / 3600);
+              const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+              const tStr = `Qolgan vaqt: ${hours} soat ${minutes} daqiqa.\n${ruleText}`;
+              exchangeChatTimer.textContent = tStr;
+            }
+
+            if (chatTimerInterval) {
+              clearInterval(chatTimerInterval);
+              chatTimerInterval = null;
+            }
+
+            updateTimer();
+            chatTimerInterval = setInterval(updateTimer, 30000); // har 30 soniyada yangilaymiz
+          }
         } else {
           msg.textContent = 'Akkaunt soni yangilandi.';
         }
@@ -1649,6 +1694,11 @@
       if (chatPollInterval) {
         clearInterval(chatPollInterval);
         chatPollInterval = null;
+      }
+
+      if (chatTimerInterval) {
+        clearInterval(chatTimerInterval);
+        chatTimerInterval = null;
       }
 
       // Avval backendga chat yopilgani haqida xabar beramiz
