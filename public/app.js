@@ -1025,18 +1025,6 @@
   // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
     btnStartExchange.addEventListener('click', async () => {
-      // Agar hozircha mos sherik bo'lmasa, foydalanuvchiga xabar chiqamiz
-      if (!hasExchangeCandidates) {
-        if (tg) {
-          tg.showAlert(
-            'Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.'
-          );
-        } else {
-          alert('Hozircha siz uchun mos almashish topilmadi. Iltimos, birozdan keyin qayta kirib ko‘ring.');
-        }
-        return;
-      }
-
       // Avval backenddan real kandidatni so'rab olamiz
       if (!currentTelegramId) {
         if (tg) tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
