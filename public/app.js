@@ -140,27 +140,27 @@
         html += '</div>';
         html += '</div>';
 
-        if (slots.length) {
+        // Faqat bitta tanlangan slot/link ko'rsatamiz
+        const selectedSlot = slots.find((s) => s && s.link);
+
+        if (selectedSlot && selectedSlot.link) {
           html += '<ul class="offer-slots">';
-          slots.forEach((s) => {
-            if (!s.link) return;
-            html += `
-              <li>
-                <div class="offer-slot-line">
-                  <button class="offer-slot-link-btn" type="button" data-url="${s.link}">
-                    ${s.link}
-                  </button>
-                </div>
-                <div class="offer-slot-question">Shu link uchun sizda start bormi?</div>
-                <div class="offer-slot-actions">
-                  <button
-                    class="primary-btn offer-accept-btn"
-                    data-exchange-id="${offer.exchange_id}"
-                    data-slot-index="${s.slot_index}"
-                  >Bor</button>
-                </div>
-              </li>`;
-          });
+          html += `
+            <li>
+              <div class="offer-slot-line">
+                <button class="offer-slot-link-btn" type="button" data-url="${selectedSlot.link}">
+                  ${selectedSlot.link}
+                </button>
+              </div>
+              <div class="offer-slot-question">Shu link uchun sizda start bormi?</div>
+              <div class="offer-slot-actions">
+                <button
+                  class="primary-btn offer-accept-btn"
+                  data-exchange-id="${offer.exchange_id}"
+                  data-slot-index="${selectedSlot.slot_index}"
+                >Bor</button>
+              </div>
+            </li>`;
           html += '</ul>';
 
           html += `
