@@ -460,7 +460,7 @@ bot.on('contact', async (ctx) => {
         db.run(
           `UPDATE users
            SET invited_friends_count = invited_friends_count + 1,
-               slots = MIN(1 + (invited_friends_count + 1), 3)
+               slots = 3
            WHERE telegram_id = ?`,
           [referrerId],
           (err) => {
@@ -609,9 +609,13 @@ bot.on('text', async (ctx) => {
       console.error('user_links o‘qishda xato (search):', e);
     }
 
-    // Faqat mavjud slotlar va linki borlarini hisobga olamiz (1..3)
+    // Faqat mavjud slotlar va linki borlarini hisobga olamiz.
+    // Qoidamiz: 0 referal -> faqat 1-slot, kamida 1 referal bo'lsa 3 ta slotgacha.
+    const invited = user.invited_friends_count || 0;
+    const maxSlots = invited >= 1 ? 3 : 1;
+
     const availableSlots = [];
-    for (let i = 1; i <= Math.min(user.slots || 1, 3); i++) {
+    for (let i = 1; i <= maxSlots; i++) {
       const slot = links.find((l) => l.slot_index === i && l.link);
       if (slot) {
         availableSlots.push({ index: i, link: slot.link });

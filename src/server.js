@@ -122,7 +122,7 @@ app.get('/api/me', async (req, res) => {
     }
 
     const invited = user.invited_friends_count || 0;
-    const effectiveSlots = Math.min(1 + invited, 3);
+    const effectiveSlots = invited >= 1 ? 3 : 1;
 
     return res.json({
       user: {
@@ -604,7 +604,7 @@ app.post('/api/slots', async (req, res) => {
     }
 
     const invited = user.invited_friends_count || 0;
-    const effectiveSlots = Math.min(1 + invited, 3);
+    const effectiveSlots = invited >= 1 ? 3 : 1;
 
     if (slotIndex > effectiveSlots) {
       return res.status(400).json({ error: 'Bu slot siz uchun hali ochilmagan' });
@@ -648,7 +648,7 @@ app.get('/api/slots', async (req, res) => {
     }
 
     const invited = user.invited_friends_count || 0;
-    const effectiveSlots = Math.min(1 + Math.floor(invited / 5), 3);
+    const effectiveSlots = invited >= 1 ? 3 : 1;
 
     const links = await getUserLinksAll(telegramId);
 
