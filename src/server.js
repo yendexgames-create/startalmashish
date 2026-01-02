@@ -156,18 +156,18 @@ app.post('/api/exchange/create', async (req, res) => {
     const exchangeId = await createExchangeRow(fromId, candId);
 
     // user1 dan foydalanib, user2 ga yuboriladigan matn
-    let uLink = user.main_link || '-';
+    const uName = user.name || '-';
+    const uLink = user.main_link || '-';
 
     const candidateText =
-      `Kimdir siz bilan start almashmoqchi.
+      `${uName} siz bilan start almashmoqchi.
 
-Sizning quyidagi linkingiz uchun:
+Sizning quyidagi linkingiz uchun taklif yubordi:
 ${uLink}
 
-Iltimos, pastdagi tugmalar orqali qaror bering.
-Agar xohlasangiz, bot chatidagi "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, almashish tafsilotlarini ko'rishingiz mumkin.
-
-Rozimisiz?`;
+Qanday davom etish kerak:
+1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.
+2. Almashish bo‘limida bu taklif tafsilotlarini ko‘rasiz va qaror qabul qilasiz.`;
 
     try {
       await bot.telegram.sendMessage(candId, candidateText);
@@ -455,6 +455,58 @@ app.get('/api/exchange/offers', async (req, res) => {
   }
 });
 
+// Siz yuborgan almashish takliflari (user1 sifatida)
+app.get('/api/exchange/sent', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    const rows = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT e.id as exchange_id, e.user1_id, e.user2_id, e.status, e.created_at,
+                u.name as user2_name, u.username as user2_username,
+                u.profile_link as user2_profile_link, u.main_link as user2_main_link,
+                u.description as user2_description
+         FROM exchanges e
+         JOIN users u ON e.user2_id = u.telegram_id
+         WHERE e.user1_id = ?
+         ORDER BY e.created_at DESC`,
+        [telegramId],
+        (err, r) => {
+          if (err) return reject(err);
+          resolve(r || []);
+        }
+      );
+    });
+
+    const sent = rows.map((row) => ({
+      exchange_id: row.exchange_id,
+      status: row.status,
+      created_at: row.created_at,
+      to_user: {
+        telegram_id: row.user2_id,
+        name: row.user2_name,
+        username: row.user2_username,
+        profile_link: row.user2_profile_link,
+        main_link: row.user2_main_link,
+        description: row.user2_description
+      }
+    }));
+
+    return res.json({ sent });
+  } catch (e) {
+    console.error('/api/exchange/sent xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // WebApp'dan kelgan taklifga (user2 tomoni) Bor/Yo'q javobini qayta ishlash
 app.post('/api/exchange/offer_action', async (req, res) => {
   try {
@@ -503,10 +555,12 @@ app.post('/api/exchange/offer_action', async (req, res) => {
 
       const uLink = user1.main_link || '-';
       const msg =
-        `Siz yuborgan quyidagi linkingiz egasi almashishga ROZI bo'ldi:
+        `Siz yuborgan shu akkaunt egasi rozi bo'ldi.
+
+Quyidagi link bo'yicha:
 ${uLink}
 
-Endi almashishni davom ettirish uchun "🧩 Web ilova" tugmasi orqali WebApp'ni ochib, takliflar bo'limini ko'rib chiqing.`;
+Almashishni boshlash uchun "🧩 Web ilova" tugmasi orqali Web ilovaga kiring.`;
 
       try {
         await bot.telegram.sendMessage(user1Id, msg);
@@ -527,10 +581,10 @@ Endi almashishni davom ettirish uchun "🧩 Web ilova" tugmasi orqali WebApp'ni 
 
       const uLink = user1.main_link || '-';
       const msg =
-        `Siz yuborgan quyidagi linkingiz bo'yicha taklif QABUL QILINMADI:
-${uLink}
+        `Shu foydalanuvchi sizning taklifingizni qabul qilmadi.
 
-Bu foydalanuvchi almashishni rad etdi. Istasangiz, boshqa sheriklar bilan almashishni davom ettirishingiz mumkin.`;
+Quyidagi link bo'yicha:
+${uLink}`;
 
       try {
         await bot.telegram.sendMessage(user1Id, msg);

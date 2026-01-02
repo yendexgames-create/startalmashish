@@ -7,6 +7,74 @@
     tg.ready();
   }
 
+  async function loadSentExchanges(telegramId) {
+    if (!exchangeSentCard || !exchangeSentList || !exchangeSentEmpty) return;
+
+    exchangeSentCard.style.display = 'none';
+    exchangeSentList.innerHTML = '';
+    exchangeSentEmpty.style.display = 'block';
+
+    try {
+      const resp = await fetch(`/api/exchange/sent?telegram_id=${telegramId}`);
+      if (!resp.ok) {
+        console.error('/api/exchange/sent fetch xato:', resp.status);
+        return;
+      }
+
+      const data = await resp.json();
+      const sent = Array.isArray(data.sent) ? data.sent : [];
+
+      if (!sent.length) {
+        exchangeSentCard.style.display = 'none';
+        return;
+      }
+
+      exchangeSentCard.style.display = 'block';
+      exchangeSentEmpty.style.display = 'none';
+
+      sent.forEach((item) => {
+        const u = item.to_user || {};
+        const wrapper = document.createElement('div');
+        wrapper.className = 'sent-offer-item';
+
+        const name = u.name || 'Foydalanuvchi';
+        const username = u.username ? `@${u.username}` : '';
+        const link = u.main_link || '-';
+
+        let statusText = 'Kutilmoqda';
+        if (item.status === 'accepted_partner') statusText = 'Qabul qilindi';
+        else if (item.status === 'rejected_partner') statusText = 'Rad etildi';
+
+        let html = '<div class="sent-offer-header">';
+        html += `<div class="sent-offer-name">${name}</div>`;
+        if (username) {
+          html += `<div class="sent-offer-username">${username}</div>`;
+        }
+        html += '</div>';
+
+        html += '<div class="sent-offer-body">';
+        html += '<div class="sent-offer-link-label">Qaysi link uchun:</div>';
+        html += `<div class="sent-offer-link">${link}</div>`;
+        html += '</div>';
+
+        html += '<div class="sent-offer-footer">';
+        html += `<div class="sent-offer-status">Holat: ${statusText}</div>`;
+        if (item.status === 'accepted_partner') {
+          html +=
+            '<button class="primary-btn sent-ready-btn" data-exchange-id="' +
+            item.exchange_id +
+            '">Men tayyorman</button>';
+        }
+        html += '</div>';
+
+        wrapper.innerHTML = html;
+        exchangeSentList.appendChild(wrapper);
+      });
+    } catch (e) {
+      console.error('/api/exchange/sent yuklash xato:', e);
+    }
+  }
+
   async function loadExchangeOffers(telegramId) {
     if (!exchangeOffersCard || !exchangeOffersList || !exchangeOffersEmpty) return;
 
@@ -138,6 +206,9 @@
   const exchangeOffersCard = document.getElementById('exchange-offers-card');
   const exchangeOffersEmpty = document.getElementById('exchange-offers-empty');
   const exchangeOffersList = document.getElementById('exchange-offers-list');
+  const exchangeSentCard = document.getElementById('exchange-sent-card');
+  const exchangeSentEmpty = document.getElementById('exchange-sent-empty');
+  const exchangeSentList = document.getElementById('exchange-sent-list');
   const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
@@ -446,6 +517,9 @@
 
       // Sizga kelgan takliflarni yuklaymiz
       await loadExchangeOffers(telegramId);
+
+      // Siz yuborgan takliflarni yuklaymiz
+      await loadSentExchanges(telegramId);
 
       // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
       if (homeUsername) {
