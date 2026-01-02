@@ -140,18 +140,52 @@
             <div id="exchange-sent-list"></div>
           </div>
 
-          <div class="card" id="exchange-chat-card" style="margin-top: 10px; display: none;">
-            <h2>💬 Chat ochildi</h2>
-            <div id="exchange-chat-partner">
-              <div id="exchange-chat-name" class="chat-partner-name">Sherik nomi</div>
-              <div id="exchange-chat-username" class="chat-partner-username">@username</div>
+          <div class="card chat-card" id="exchange-chat-card" style="margin-top: 10px; display: none;">
+            <div class="chat-header">
+              <div class="chat-header-avatar" id="exchange-chat-avatar">S</div>
+              <div class="chat-header-info">
+                <div id="exchange-chat-name" class="chat-partner-name">Sherik nomi</div>
+                <div id="exchange-chat-username" class="chat-partner-username">@username</div>
+              </div>
             </div>
-            <p class="hint-text" style="margin-top: 8px;">Quyidagi link orqali sherigingiz botiga o‘ting va chatni boshlang:</p>
-            <button id="exchange-chat-link" type="button" class="primary-btn chat-link-btn">https://t.me/yourbot</button>
-            <p class="hint-text" style="margin-top: 10px;">
-              Chat Telegram ichida davom etadi. Bu yerda almashish tafsilotlari saqlanadi.
-            </p>
-            <button id="exchange-chat-close" type="button" class="secondary-btn" style="margin-top: 10px;">Chatni yopish</button>
+
+            <div class="chat-pinned">
+              <div class="chat-pinned-label">Bu sherigingizning linki</div>
+              <button id="exchange-chat-link" type="button" class="primary-btn chat-link-btn">https://t.me/yourbot</button>
+            </div>
+
+            <div class="chat-body">
+              <div id="exchange-chat-messages" class="chat-messages">
+                <!-- Dastlabki tizim xabarlari JS orqali to'ldiriladi -->
+              </div>
+
+              <div class="chat-input-area" id="exchange-chat-accounts-area">
+                <div class="chat-input-label">Bu bot uchun necha ta akkauntingiz bor?</div>
+                <div class="chat-input-row">
+                  <select id="chat-accounts-select" class="chat-accounts-select">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                  </select>
+                  <button id="chat-accounts-submit" type="button" class="primary-btn chat-accounts-submit">Yuborish</button>
+                </div>
+              </div>
+
+              <div class="chat-input-area" id="exchange-chat-text-area">
+                <div class="chat-input-row chat-text-input-row">
+                  <input
+                    id="chat-message-input"
+                    type="text"
+                    class="chat-text-input"
+                    placeholder="Xabar yozish..."
+                  />
+                  <button id="chat-message-send" type="button" class="primary-btn chat-text-send">Yuborish</button>
+                </div>
+              </div>
+            </div>
+
+            <button id="exchange-chat-close" type="button" class="secondary-btn chat-close-btn">Chatni yopish</button>
           </div>
         </section>
 

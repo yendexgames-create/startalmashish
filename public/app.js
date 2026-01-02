@@ -221,10 +221,17 @@
   const exchangeSentEmpty = document.getElementById('exchange-sent-empty');
   const exchangeSentList = document.getElementById('exchange-sent-list');
   const exchangeChatCard = document.getElementById('exchange-chat-card');
+  const exchangeChatAvatar = document.getElementById('exchange-chat-avatar');
   const exchangeChatName = document.getElementById('exchange-chat-name');
   const exchangeChatUsername = document.getElementById('exchange-chat-username');
   const exchangeChatLink = document.getElementById('exchange-chat-link');
   const exchangeChatClose = document.getElementById('exchange-chat-close');
+  const exchangeChatMessages = document.getElementById('exchange-chat-messages');
+  const chatAccountsArea = document.getElementById('exchange-chat-accounts-area');
+  const chatAccountsSelect = document.getElementById('chat-accounts-select');
+  const chatAccountsSubmit = document.getElementById('chat-accounts-submit');
+  const chatMessageInput = document.getElementById('chat-message-input');
+  const chatMessageSend = document.getElementById('chat-message-send');
   const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
@@ -252,8 +259,14 @@
     currentChatExchangeId = exchangeId;
     hideExchangeCards();
 
+    const name = partner && partner.name ? partner.name : 'Sherik';
+
+    if (exchangeChatAvatar) {
+      const initial = name.trim() ? name.trim().charAt(0).toUpperCase() : 'S';
+      exchangeChatAvatar.textContent = initial;
+    }
     if (exchangeChatName) {
-      exchangeChatName.textContent = partner && partner.name ? partner.name : 'Sherik';
+      exchangeChatName.textContent = name;
     }
     if (exchangeChatUsername) {
       exchangeChatUsername.textContent = partner && partner.username ? `@${partner.username}` : '';
@@ -264,8 +277,50 @@
       exchangeChatLink.dataset.url = link || '';
     }
 
+    if (exchangeChatMessages) {
+      exchangeChatMessages.innerHTML = '';
+
+      const firstMsg = document.createElement('div');
+      firstMsg.className = 'chat-message chat-message-system';
+      const linkText = (partner && partner.main_link) || 'https://t.me/yourbot';
+      firstMsg.innerHTML =
+        `<div>Bu chat faqat kelishib olish uchun. Startlarni bot ichida olasiz.</div>
+         <div style="margin-top:4px;">Sherigingizning linki: <span style="word-break:break-all;">${linkText}</span></div>
+         <div style="margin-top:6px;">Quyida bu bot uchun nechta akkauntingiz borligini tanlang.</div>`;
+      exchangeChatMessages.appendChild(firstMsg);
+    }
+
     if (exchangeChatCard) {
       exchangeChatCard.style.display = 'block';
+    }
+  }
+
+  function appendSelfChatMessage(text) {
+    if (!exchangeChatMessages) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const msg = document.createElement('div');
+    msg.className = 'chat-message chat-message-self';
+    msg.textContent = trimmed;
+    exchangeChatMessages.appendChild(msg);
+
+    if (exchangeChatMessages.scrollHeight) {
+      exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+    }
+  }
+
+  function appendPartnerChatMessage(baseText) {
+    if (!exchangeChatMessages) return;
+    const msg = document.createElement('div');
+    msg.className = 'chat-message chat-message-partner';
+
+    const text = baseText && baseText.trim() ? baseText.trim() : 'OK, kelishdik.';
+    msg.textContent = text;
+    exchangeChatMessages.appendChild(msg);
+
+    if (exchangeChatMessages.scrollHeight) {
+      exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
     }
   }
 
@@ -463,6 +518,57 @@
         b.classList.add('nav-item-active');
       } else {
         b.classList.remove('nav-item-active');
+      }
+    });
+  }
+
+  // Akkaunt soni bo'yicha kelishish – faqat UI darajasida
+  if (chatAccountsSubmit && chatAccountsSelect && exchangeChatMessages) {
+    chatAccountsSubmit.addEventListener('click', () => {
+      const myVal = parseInt(chatAccountsSelect.value, 10) || 1;
+
+      // Hozircha sherikdagi akkaunt soni sifatida 1 ni qabul qilamiz
+      const partnerAccounts = 1;
+      const minAccounts = Math.min(myVal, partnerAccounts);
+
+      const msg = document.createElement('div');
+      msg.className = 'chat-message chat-message-system';
+      msg.innerHTML =
+        `<div>Siz bu bot uchun <b>${myVal}</b> ta akkaunt bor deb tanladingiz.</div>
+         <div style="margin-top:4px;">Sherigingizda hozircha <b>${partnerAccounts}</b> ta akkaunt bor deb hisoblanadi.</div>
+         <div style="margin-top:6px;">Shuning uchun har ikkala tomondan <b>${minAccounts}</b> tadan start olinadi.</div>`;
+
+      exchangeChatMessages.appendChild(msg);
+
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+    });
+  }
+
+  // Oddiy chat xabarlari – faqat UI darajasida
+  if (chatMessageSend && chatMessageInput) {
+    chatMessageSend.addEventListener('click', () => {
+      const val = chatMessageInput.value || '';
+      appendSelfChatMessage(val);
+      chatMessageInput.value = '';
+
+      // Kichik kechikish bilan sherikdan soxta javob
+      setTimeout(() => {
+        appendPartnerChatMessage('Yaxshi, davom etamiz.');
+      }, 800 + Math.random() * 700);
+    });
+
+    chatMessageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = chatMessageInput.value || '';
+        appendSelfChatMessage(val);
+        chatMessageInput.value = '';
+
+        setTimeout(() => {
+          appendPartnerChatMessage('Tushundim, rahmat.');
+        }, 800 + Math.random() * 700);
       }
     });
   }

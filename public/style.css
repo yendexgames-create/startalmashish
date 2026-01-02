@@ -497,6 +497,152 @@ body {
   color: #9ca3af;
 }
 
+/* Chat kartasi (Telegram uslubida) */
+.chat-card {
+  padding: 10px 10px 12px;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.chat-header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7fa650, #8bc34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.chat-header-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-pinned {
+  border-radius: 12px;
+  background: rgba(31, 41, 55, 0.8);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.chat-pinned-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.chat-body {
+  border-radius: 14px;
+  background: #050505;
+  padding: 8px 8px 10px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-message {
+  max-width: 85%;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.chat-message-system {
+  align-self: flex-start;
+  background: #111827;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.chat-message-self {
+  align-self: flex-end;
+  background: #1f2937;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.chat-message-partner {
+  align-self: flex-start;
+  background: #08101f;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.chat-input-area {
+  border-top: 1px solid #1f2933;
+  padding-top: 8px;
+  margin-top: 6px;
+}
+
+.chat-input-label {
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-accounts-select {
+  flex: 0 0 64px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #f9fafb;
+}
+
+.chat-accounts-submit {
+  flex: 1;
+  font-size: 0.85rem;
+  padding-block: 6px;
+}
+
+.chat-text-input-row {
+  margin-top: 4px;
+}
+
+.chat-text-input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 0.9rem;
+}
+
+.chat-text-input::placeholder {
+  color: #6b7280;
+}
+
+.chat-text-send {
+  flex: 0 0 auto;
+  padding-block: 6px;
+  font-size: 0.9rem;
+}
+
+.chat-close-btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
 /* Bosh sahifa mini profil */
 #home-mini-profile {
   display: flex;
