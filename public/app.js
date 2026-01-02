@@ -974,11 +974,82 @@
     const links = slotsData?.links || [];
 
     const slot1 = links.find((l) => l.slot_index === 1);
+    const slot2 = links.find((l) => l.slot_index === 2);
+    const slot3 = links.find((l) => l.slot_index === 3);
     const currentLink = slot1?.link || '';
     const currentDesc = slot1?.description || '';
 
+    const slot2Link = slot2?.link || '';
+    const slot2Desc = slot2?.description || '';
+    const slot3Link = slot3?.link || '';
+    const slot3Desc = slot3?.description || '';
+
     const lockedText2 = totalSlots >= 2 ? '' : ' (1 ta do‘st taklif qilgandan keyin ochiladi)';
     const lockedText3 = totalSlots >= 3 ? '' : ' (2 ta do‘st taklif qilgandan keyin ochiladi)';
+
+    let slot2Html = '';
+    if (totalSlots >= 2) {
+      slot2Html = `
+      <div class="slot-card">
+        <div class="slot-card-header">
+          <div class="slot-card-title">2-slot</div>
+          <div class="slot-card-status">${slot2Link ? '🟢 Faol' : '⚪ Kutilmoqda'}</div>
+        </div>
+        <div class="slot-card-link">${slot2Link || 'Hali link kiritilmagan'}</div>
+        <div class="slot-card-desc">${slot2Desc || 'Ikkinchi slot uchun boshqa bot/linkni saqlashingiz mumkin.'}</div>
+        <div class="slot-edit">
+          <label class="slot-label">2-slot uchun link:</label>
+          <input id="slot2-link-input" class="slot-input" type="text" placeholder="https://t.me/yourbot?start=..." value="${slot2Link || ''}" />
+          <label class="slot-label">Qisqacha tavsif:</label>
+          <textarea id="slot2-desc-input" class="slot-textarea" rows="2" placeholder="Bu slot nima uchun?">${slot2Desc || ''}</textarea>
+          <button id="slot2-save-btn" class="primary-btn slot-save-btn">✏️ Saqlash</button>
+        </div>
+      </div>`;
+    } else {
+      slot2Html = `
+      <div class="slot-card slot-card--locked">
+        <div class="slot-card-header">
+          <div class="slot-card-title">2-slot</div>
+          <div class="slot-card-status">🔒 Qulfda</div>
+        </div>
+        <div class="slot-card-desc">
+          Yana do‘stlar taklif qiling, keyingi slotlar ochiladi.
+          ${lockedText2}
+        </div>
+      </div>`;
+    }
+
+    let slot3Html = '';
+    if (totalSlots >= 3) {
+      slot3Html = `
+      <div class="slot-card">
+        <div class="slot-card-header">
+          <div class="slot-card-title">3-slot</div>
+          <div class="slot-card-status">${slot3Link ? '🟢 Faol' : '⚪ Kutilmoqda'}</div>
+        </div>
+        <div class="slot-card-link">${slot3Link || 'Hali link kiritilmagan'}</div>
+        <div class="slot-card-desc">${slot3Desc || 'Uchinchi slot uchun yana bir bot/link saqlashingiz mumkin.'}</div>
+        <div class="slot-edit">
+          <label class="slot-label">3-slot uchun link:</label>
+          <input id="slot3-link-input" class="slot-input" type="text" placeholder="https://t.me/yourbot?start=..." value="${slot3Link || ''}" />
+          <label class="slot-label">Qisqacha tavsif:</label>
+          <textarea id="slot3-desc-input" class="slot-textarea" rows="2" placeholder="Bu slot nima uchun?">${slot3Desc || ''}</textarea>
+          <button id="slot3-save-btn" class="primary-btn slot-save-btn">✏️ Saqlash</button>
+        </div>
+      </div>`;
+    } else {
+      slot3Html = `
+      <div class="slot-card slot-card--locked">
+        <div class="slot-card-header">
+          <div class="slot-card-title">3-slot</div>
+          <div class="slot-card-status">🔒 Qulfda</div>
+        </div>
+        <div class="slot-card-desc">
+          Ko‘proq referal taklif qilganingizda ochiladi.
+          ${lockedText3}
+        </div>
+      </div>`;
+    }
 
     slotsDiv.innerHTML = `
       <div class="slot-card slot-card--active">
@@ -997,26 +1068,8 @@
           <p class="hint-text">Linkingiz va tavsif Web ilova va botdagi almashishlarda ishlatiladi.</p>
         </div>
       </div>
-      <div class="slot-card ${totalSlots >= 2 ? '' : 'slot-card--locked'}">
-        <div class="slot-card-header">
-          <div class="slot-card-title">2-slot</div>
-          <div class="slot-card-status">${totalSlots >= 2 ? '🟢 Ochiq' : '🔒 Qulfda'}</div>
-        </div>
-        <div class="slot-card-desc">
-          ${totalSlots >= 2 ? 'Bu slot keyinroq Web ilovada tahrir qilinadi.' : 'Yana do‘stlar taklif qiling, 5 ta do‘stdan keyin ochiladi.'}
-          ${lockedText2}
-        </div>
-      </div>
-      <div class="slot-card ${totalSlots >= 3 ? '' : 'slot-card--locked'}">
-        <div class="slot-card-header">
-          <div class="slot-card-title">3-slot</div>
-          <div class="slot-card-status">${totalSlots >= 3 ? '🟢 Ochiq' : '🔒 Qulfda'}</div>
-        </div>
-        <div class="slot-card-desc">
-          ${totalSlots >= 3 ? 'Bu slot keyinroq Web ilovada tahrir qilinadi.' : 'Ko‘proq referal taklif qilganingizda ochiladi.'}
-          ${lockedText3}
-        </div>
-      </div>
+      ${slot2Html}
+      ${slot3Html}
     `;
 
     const saveBtn = document.getElementById('slot1-save-btn');
@@ -1081,6 +1134,120 @@
         }
       });
     }
+
+    const saveBtn2 = document.getElementById('slot2-save-btn');
+    if (saveBtn2) {
+      saveBtn2.addEventListener('click', async () => {
+        if (!currentTelegramId) {
+          if (tg) {
+            tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+          }
+          return;
+        }
+
+        const linkInput = document.getElementById('slot2-link-input');
+        const descInput = document.getElementById('slot2-desc-input');
+        const newLink = linkInput.value.trim();
+        const newDesc = descInput.value.trim();
+
+        if (!newLink || !newLink.startsWith('http')) {
+          if (tg) tg.showAlert('Iltimos, to‘g‘ri link kiriting (https:// bilan).');
+          return;
+        }
+
+        try {
+          const resp = await fetch('/api/slots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              slot_index: 2,
+              link: newLink,
+              description: newDesc
+            })
+          });
+
+          if (!resp.ok) {
+            const data = await resp.json().catch(() => null);
+            const msg = data && data.error ? data.error : 'Saqlashda xatolik yuz berdi.';
+            if (tg) tg.showAlert(msg);
+            return;
+          }
+
+          if (tg) {
+            tg.showPopup({
+              title: 'Saqlangan',
+              message: '2-slot uchun linkingiz va tavsif saqlandi.',
+              buttons: [{ id: 'ok', type: 'close', text: 'OK' }]
+            });
+          }
+
+          await loadFromBackend();
+        } catch (e) {
+          console.error('2-slot saqlashda xato:', e);
+          if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+        }
+      });
+    }
+
+    const saveBtn3 = document.getElementById('slot3-save-btn');
+    if (saveBtn3) {
+      saveBtn3.addEventListener('click', async () => {
+        if (!currentTelegramId) {
+          if (tg) {
+            tg.showAlert('Telegram foydalanuvchi ID topilmadi. Web ilovani qayta ochib ko‘ring.');
+          }
+          return;
+        }
+
+        const linkInput = document.getElementById('slot3-link-input');
+        const descInput = document.getElementById('slot3-desc-input');
+        const newLink = linkInput.value.trim();
+        const newDesc = descInput.value.trim();
+
+        if (!newLink || !newLink.startsWith('http')) {
+          if (tg) tg.showAlert('Iltimos, to‘g‘ri link kiriting (https:// bilan).');
+          return;
+        }
+
+        try {
+          const resp = await fetch('/api/slots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              slot_index: 3,
+              link: newLink,
+              description: newDesc
+            })
+          });
+
+          if (!resp.ok) {
+            const data = await resp.json().catch(() => null);
+            const msg = data && data.error ? data.error : 'Saqlashda xatolik yuz berdi.';
+            if (tg) tg.showAlert(msg);
+            return;
+          }
+
+          if (tg) {
+            tg.showPopup({
+              title: 'Saqlangan',
+              message: '3-slot uchun linkingiz va tavsif saqlandi.',
+              buttons: [{ id: 'ok', type: 'close', text: 'OK' }]
+            });
+          }
+
+          await loadFromBackend();
+        } catch (e) {
+          console.error('3-slot saqlashda xato:', e);
+          if (tg) tg.showAlert('Server bilan aloqa o‘rnatib bo‘lmadi. Keyinroq urinib ko‘ring.');
+        }
+      });
+    }
   }
 
   function renderFriends(friends) {
@@ -1092,19 +1259,22 @@
 
     const items = friends.map((f) => {
       const name = f.name || '-';
-      const username = f.username ? '@' + f.username : '-';
-      const profile = f.profile_link || '#';
-      const initial = (name && name.charAt(0).toUpperCase()) || (username && username.charAt(1).toUpperCase()) || '?';
+      const username = f.username ? '@' + f.username : '';
+      const initial =
+        (name && name.charAt(0).toUpperCase()) || (username && username.charAt(1).toUpperCase()) || '?';
+
+      // Hozircha onlayn/offlayn holatini backenddan olmaymiz, statik ko'rinishda ko'rsatamiz
+      const statusText = 'offline';
+
       return `
         <li class="friend-item">
           <div class="friend-main">
             <div class="friend-avatar">${initial}</div>
-            <div>
+            <div class="friend-info">
               <div class="friend-name">${name}</div>
-              <div class="friend-username">${username}</div>
+              <div class="friend-status">${statusText}</div>
             </div>
           </div>
-          <div class="friend-link"><a href="${profile}" target="_blank">🔗 Profil</a></div>
         </li>
       `;
     });
