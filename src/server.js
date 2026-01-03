@@ -364,8 +364,11 @@ app.post('/api/exchange/messages', async (req, res) => {
       return res.status(404).json({ error: 'Almashish topilmadi' });
     }
 
-    // Faqat ishtirokchilar va faqat ready_chat holatida xabar yuborishi mumkin
-    if (ex.status !== 'ready_chat' || (ex.user1_id !== userId && ex.user2_id !== userId)) {
+    // Faqat ishtirokchilar va faqat chat ruxsat etilgan holatlarda (ready_chat yoki waiting_screenshots) xabar yuborishi mumkin
+    if (
+      (ex.status !== 'ready_chat' && ex.status !== 'waiting_screenshots') ||
+      (ex.user1_id !== userId && ex.user2_id !== userId)
+    ) {
       return res.status(400).json({ error: 'Bu almashish uchun chat ruxsat etilmagan' });
     }
 
@@ -540,7 +543,7 @@ app.get('/api/exchange/active_chat', async (req, res) => {
     const ex = await new Promise((resolve, reject) => {
       db.get(
         `SELECT * FROM exchanges
-         WHERE status = 'ready_chat' AND (user1_id = ? OR user2_id = ?)
+         WHERE status IN ('ready_chat', 'waiting_screenshots') AND (user1_id = ? OR user2_id = ?)
          ORDER BY created_at DESC
          LIMIT 1`,
         [telegramId, telegramId],

@@ -1844,6 +1844,18 @@
       if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
       if (exchangeCard) exchangeCard.style.display = 'none';
 
+      // Chat yopilganda takliflar ro'yxatini ham yangilab olamiz
+      if (currentTelegramId) {
+        try {
+          await Promise.all([
+            loadExchangeOffers(currentTelegramId),
+            loadSentExchanges(currentTelegramId)
+          ]);
+        } catch (e) {
+          console.error('Chat yopilganda takliflarni yangilash xato:', e);
+        }
+      }
+
       if (currentTelegramId) {
         // Takliflar va yuborilgan takliflarni yangilab olamiz
         await loadExchangeOffers(currentTelegramId);
