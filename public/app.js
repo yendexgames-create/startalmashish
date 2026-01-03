@@ -7,6 +7,43 @@
     tg.ready();
   }
 
+  // Screenshot yuborish: fayl tanlanganda Cloudinary orqali backendga yuborish
+  if (chatScreenshotInput) {
+    chatScreenshotInput.addEventListener('change', async () => {
+      const file = chatScreenshotInput.files && chatScreenshotInput.files[0];
+      if (!file || !currentTelegramId || !currentChatExchangeId) return;
+
+      const formData = new FormData();
+      formData.append('telegram_id', String(currentTelegramId));
+      formData.append('exchange_id', String(currentChatExchangeId));
+      formData.append('account_index', String(currentScreenshotAccountIndex || 1));
+      formData.append('file', file);
+
+      try {
+        const resp = await fetch('/api/exchange/screenshot', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data || !data.ok || !data.url) {
+          const msgText = (data && data.error) || 'Screenshot yuborishda xatolik yuz berdi.';
+          if (tg) tg.showAlert(msgText);
+          return;
+        }
+
+        const idx = data.account_index || currentScreenshotAccountIndex || 1;
+        const text = `[SCREENSHOT ${idx}] ${data.url}`;
+        appendSelfChatMessage(text);
+      } catch (e) {
+        console.error('/api/exchange/screenshot POST xato:', e);
+        if (tg) tg.showAlert('Screenshot yuborishda xatolik yuz berdi. Keyinroq urinib ko\'ring.');
+      } finally {
+        chatScreenshotInput.value = '';
+      }
+    });
+  }
+
   async function startExchangePolling() {
     if (exchangePollInterval) return;
     if (!tg) return;
@@ -395,15 +432,18 @@
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    const isScreenshot = trimmed.startsWith('[SCREENSHOT]');
+    const isScreenshot = trimmed.startsWith('[SCREENSHOT');
 
     const msg = document.createElement('div');
     msg.className = 'chat-message chat-message-self';
 
     if (isScreenshot) {
-      const url = trimmed.replace('[SCREENSHOT]', '').trim();
+      const match = trimmed.match(/^\[SCREENSHOT(?:\s+(\d+))?\]\s+(.+)$/);
+      const accountIndex = match && match[1] ? parseInt(match[1], 10) : null;
+      const url = match && match[2] ? match[2].trim() : trimmed.replace(/\[SCREENSHOT.*?\]/, '').trim();
+      const label = accountIndex ? `${accountIndex}-akkauntdan screenshot yubordingiz.` : 'Siz screenshot yubordingiz.';
       msg.innerHTML =
-        `<div>Siz screenshot yubordingiz.</div>
+        `<div>${label}</div>
          <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
     } else {
       msg.textContent = trimmed;
@@ -422,20 +462,26 @@
     msg.className = 'chat-message chat-message-partner';
 
     const text = baseText && baseText.trim() ? baseText.trim() : 'OK, kelishdik.';
-    const isScreenshot = text.startsWith('[SCREENSHOT]');
+    const isScreenshot = text.startsWith('[SCREENSHOT');
 
     if (isScreenshot) {
-      const url = text.replace('[SCREENSHOT]', '').trim();
+      const match = text.match(/^\[SCREENSHOT(?:\s+(\d+))?\]\s+(.+)$/);
+      const accountIndex = match && match[1] ? parseInt(match[1], 10) : null;
+      const url = match && match[2] ? match[2].trim() : text.replace(/\[SCREENSHOT.*?\]/, '').trim();
+      const label = accountIndex ? `${accountIndex}-akkauntdan screenshot yubordi.` : 'Sherigingiz screenshot yubordi.';
       msg.innerHTML =
-        `<div>Sherigingiz screenshot yubordi.</div>
+        `<div>${label}</div>
          <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
       exchangeChatMessages.appendChild(msg);
 
       // Pinned-like savol: keldi / kelmadi
       const qa = document.createElement('div');
       qa.className = 'chat-message chat-message-system';
+      const questionLabel = accountIndex
+        ? `${accountIndex}-akkauntdan kelgan start bormi?`
+        : 'Bu screenshot bo\'yicha start keldimi?';
       qa.innerHTML =
-        `<div>Bu screenshot bo'yicha start keldimi?</div>
+        `<div>${questionLabel}</div>
          <div style="margin-top:6px; display:flex; gap:8px;">
            <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
            <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>

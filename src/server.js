@@ -223,8 +223,9 @@ app.post('/api/exchange/screenshot', upload.single('file'), async (req, res) => 
       );
     });
 
-    // Chat tarixida ham maxsus screenshot xabarini saqlaymiz
-    const screenshotText = `[SCREENSHOT] ${imageUrl}`;
+    // Chat tarixida ham maxsus screenshot xabarini saqlaymiz, akkaunt raqami bilan
+    const indexPart = typeof accountIndex === 'number' ? ` ${accountIndex}` : '';
+    const screenshotText = `[SCREENSHOT${indexPart}] ${imageUrl}`;
 
     await new Promise((resolve, reject) => {
       db.run(
@@ -609,17 +610,21 @@ app.post('/api/exchange/close_chat', async (req, res) => {
       return res.status(404).json({ error: 'Almashish topilmadi' });
     }
 
-    // Faqat shu almashuv ishtirokchilari va faqat ready_chat bo'lsa yopish mumkin
-    if ((ex.user1_id !== userId && ex.user2_id !== userId) || ex.status !== 'ready_chat') {
+    // Faqat shu almashuv ishtirokchilari yopishi mumkin
+    if (ex.user1_id !== userId && ex.user2_id !== userId) {
       return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi yoki chat holatida emas' });
     }
 
-    await new Promise((resolve, reject) => {
-      db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
-        if (err) return reject(err);
-        resolve();
+    // Agar holat chat ruxsat etilgan bo'lsa (ready_chat yoki waiting_screenshots), completed ga o'zgartiramiz.
+    // Aks holda hech narsa o'zgartirmaymiz, lekin baribir ok:true qaytaramiz.
+    if (ex.status === 'ready_chat' || ex.status === 'waiting_screenshots') {
+      await new Promise((resolve, reject) => {
+        db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
       });
-    });
+    }
 
     return res.json({ ok: true });
   } catch (e) {
