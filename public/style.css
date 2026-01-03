@@ -583,7 +583,7 @@ body {
   border-radius: 14px;
   background: #050505;
   padding: 8px 8px 10px;
-  max-height: 520px;
+  max-height: 620px;
   display: flex;
   flex-direction: column;
 }
@@ -656,6 +656,10 @@ body {
 
 .chat-text-input-row {
   margin-top: 4px;
+}
+
+#exchange-chat-screenshot-area {
+  display: none;
 }
 
 .chat-text-input {

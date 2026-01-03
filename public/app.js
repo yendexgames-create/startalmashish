@@ -314,6 +314,20 @@
          <div style="margin-top:4px;">Sherigingizning linki: <span style="word-break:break-all;">${linkText}</span></div>
          <div style="margin-top:6px;">Quyida bu bot uchun nechta akkauntingiz borligini tanlang.</div>`;
       exchangeChatMessages.appendChild(firstMsg);
+
+      const screenshotPrompt = document.createElement('div');
+      screenshotPrompt.className = 'chat-message chat-message-system';
+      screenshotPrompt.innerHTML =
+        `<div>Shu link uchun bosgan startingizni rasmga olib yuboring.</div>
+         <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">Screenshot yuklash</button>`;
+      exchangeChatMessages.appendChild(screenshotPrompt);
+
+      const inlineBtn = screenshotPrompt.querySelector('button');
+      if (inlineBtn && chatScreenshotInput) {
+        inlineBtn.addEventListener('click', () => {
+          chatScreenshotInput.click();
+        });
+      }
     }
 
     // Timer matnini tozalab qo'yamiz
