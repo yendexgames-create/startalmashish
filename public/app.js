@@ -663,33 +663,124 @@
             exchange_id: currentChatExchangeId,
             count: myVal
           })
-        });
-
-        const data = await resp.json().catch(() => null);
-
-        if (!resp.ok || !data || !data.ok) {
-          const msgText = (data && data.error) || 'Screenshot yuklashda xatolik yuz berdi.';
-          if (tg) tg.showAlert(msgText);
-        } else if (data && data.url) {
-          // Optimistik tarzda o'zimizga screenshot xabarini ko'rsatamiz
-          const url = data.url;
-          const markerText = `[SCREENSHOT] ${url}`;
-          appendSelfChatMessage(markerText);
-        }
-        // Muvaffaqiyatda maxsus chat xabarini backend allaqachon qo'shgan, polling orqali ko'rinadi
-      } catch (e) {
-        console.error('Screenshot yuklashda xato:', e);
-        if (tg) tg.showAlert('Screenshot yuklashda xatolik yuz berdi.');
       }
-    });
-  }
 
-// ...
-            text: val
-          })
-        });
+      const state = data.state;
+      const myCount = data.my_count;
+      const otherCount = data.other_count;
+      const minAccounts = data.min_accounts;
+      const deadlineTs = data.deadline_ts;
 
-        const data = await resp.json().catch(() => null);
+      const msg = document.createElement('div');
+      msg.className = 'chat-message chat-message-system';
+
+      if (state === 'waiting_other') {
+        msg.innerHTML =
+          `<div>Siz <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
+           <div>Sherigingiz hali javob bermadi. Uning ham nechta akkaunti borligini kutyapmiz.</div>`;
+      } else if (state === 'both_set') {
+        msg.innerHTML =
+          `<div>Siz: <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
+           <div>Sherigingiz: <b>${otherCount}</b> ta akkaunt deb tanladi.</div>
+           <div style="margin-top:6px;">Adolatli bo'lishi uchun eng kichik son olinadi: <b>${minAccounts}</b> tadan start qilinadi.</div>`;
+
+        if (chatAccountsArea) {
+          chatAccountsArea.style.display = 'none';
+        }
+
+        // Timer
+        if (deadlineTs && exchangeChatTimer) {
+          const deadline = new Date(deadlineTs);
+
+          function updateTimer() {
+            const now = new Date();
+            const diffMs = deadline.getTime() - now.getTime();
+            if (diffMs <= 0) {
+              exchangeChatTimer.textContent =
+                'Tayyorlash uchun ajratilgan 24 soat tugadi. Barcha startlar yakunlangan bo‘lishi kerak.';
+              if (chatTimerInterval) {
+                clearInterval(chatTimerInterval);
+                chatTimerInterval = null;
+              }
+              return;
+            }
+
+            const diffMinTotal = Math.floor(diffMs / 60000);
+            const hours = Math.floor(diffMinTotal / 60);
+            const mins = diffMinTotal % 60;
+            exchangeChatTimer.textContent = `Qolgan vaqt: ${hours} soat ${mins} daqiqa. Ikkala tomon ham startlarni shu vaqt ichida bosishi kerak.`;
+          }
+
+          if (chatTimerInterval) {
+            clearInterval(chatTimerInterval);
+            chatTimerInterval = null;
+          }
+
+          updateTimer();
+          chatTimerInterval = setInterval(updateTimer, 30000); // har 30 soniyada yangilaymiz
+        }
+
+        // Akkaunt soni kelishilgandan keyin har bir akkaunt uchun alohida screenshot so'rovi xabarlari
+        if (exchangeChatMessages && chatScreenshotInput && typeof minAccounts === 'number' && minAccounts > 0) {
+          for (let i = 1; i <= minAccounts; i += 1) {
+            const prompt = document.createElement('div');
+            prompt.className = 'chat-message chat-message-system';
+            prompt.innerHTML =
+              `<div>${i}-akkaunt uchun shu linkdan bosgan startingizni rasmga olib yuboring.</div>
+               <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">${i}-akkauntdan screenshot yuklash</button>`;
+            exchangeChatMessages.appendChild(prompt);
+
+            const btn = prompt.querySelector('button');
+            if (btn) {
+              btn.addEventListener('click', () => {
+                currentScreenshotAccountIndex = i;
+                chatScreenshotInput.click();
+              });
+            }
+          }
+
+          if (exchangeChatMessages.scrollHeight) {
+            exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+          }
+        }
+      } else {
+        msg.textContent = 'Akkaunt soni yangilandi.';
+      }
+
+      exchangeChatMessages.appendChild(msg);
+
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+    } catch (e) {
+      console.error('/api/exchange/accounts POST xato:', e);
+      if (tg) tg.showAlert('Akkaunt sonini saqlashda xatolik yuz berdi.');
+    }
+  });
+}
+
+chatMessageInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = (chatMessageInput.value || '').trim();
+    if (!val || !currentTelegramId || !currentChatExchangeId) return;
+
+    appendSelfChatMessage(val);
+    chatMessageInput.value = '';
+
+    fetch('/api/exchange/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        telegram_id: currentTelegramId,
+        exchange_id: currentChatExchangeId,
+        text: val
+      })
+    })
+      .then((resp) => resp.json().catch(() => null).then((data) => ({ resp, data })))
+      .then(({ resp, data }) => {
         if (resp.ok && data && data.message && typeof data.message.id === 'number') {
           if (data.message.id > chatLastMessageId) {
             chatLastMessageId = data.message.id;
@@ -698,15 +789,9 @@
           const msg = (data && data.error) || 'Xabar yuborishda xatolik yuz berdi.';
           tg.showAlert(msg);
         }
-      } catch (e) {
-        console.error('/api/exchange/messages POST xato:', e);
-      }
-    });
-
-    chatMessageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const val = (chatMessageInput.value || '').trim();
+      })
+      .catch((err) => {
+        console.error('/api/exchange/messages POST xato (enter):', err);
         if (!val || !currentTelegramId || !currentChatExchangeId) return;
 
         appendSelfChatMessage(val);
