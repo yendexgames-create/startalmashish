@@ -1,6 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
 import { db, upsertUserLink, getUserLinks } from './db.js';
 import { bot } from './bot.js';
 
@@ -14,6 +17,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Cloudinary sozlamalari
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Multer memory storage – rasmlarni Cloudinary'ga to'g'ridan-to'g'ri yuborish uchun
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Static fayllar (WebApp)
 const publicDir = path.join(__dirname, '..', 'public');
@@ -140,6 +153,79 @@ app.get('/api/me', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/me xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
+// WebApp'dan screenshot yuklash (Cloudinary orqali)
+app.post('/api/exchange/screenshot', upload.single('file'), async (req, res) => {
+  try {
+    const { telegram_id, exchange_id, account_index } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+    const accountIndex = parseInt(account_index, 10) || 1;
+
+    if (!userId || !exId) {
+      return res.status(400).json({ error: 'telegram_id va exchange_id body da kerak' });
+    }
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'Rasm fayli yuborilmadi' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    if (ex.user1_id !== userId && ex.user2_id !== userId) {
+      return res.status(403).json({ error: 'Bu almashishga siz bog\'liq emassiz' });
+    }
+
+    // Cloudinary'ga yuklaymiz
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'start-almashish',
+          resource_type: 'image'
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+
+      stream.end(req.file.buffer);
+    });
+
+    const imageUrl = uploadResult && uploadResult.secure_url ? uploadResult.secure_url : null;
+    if (!imageUrl) {
+      return res.status(500).json({ error: 'Rasmni yuklashda xatolik yuz berdi' });
+    }
+
+    const now = Date.now();
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO exchange_screenshots (exchange_id, user_id, file_id, created_at) VALUES (?, ?, ?, ?)',
+        [exId, userId, imageUrl, now],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
+    return res.json({ ok: true, url: imageUrl, account_index: accountIndex });
+  } catch (e) {
+    console.error('/api/exchange/screenshot xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
   }
 });

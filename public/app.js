@@ -7,6 +7,60 @@
     tg.ready();
   }
 
+  // Screenshot yuklash – Cloudinary orqali backendga
+  if (chatScreenshotButton && chatScreenshotInput && exchangeChatMessages) {
+    chatScreenshotButton.addEventListener('click', () => {
+      chatScreenshotInput.click();
+    });
+
+    chatScreenshotInput.addEventListener('change', async () => {
+      const file = chatScreenshotInput.files && chatScreenshotInput.files[0];
+      if (!file || !currentTelegramId || !currentChatExchangeId) return;
+
+      const formData = new FormData();
+      formData.append('telegram_id', String(currentTelegramId));
+      formData.append('exchange_id', String(currentChatExchangeId));
+      formData.append('account_index', '1');
+      formData.append('file', file);
+
+      chatScreenshotButton.disabled = true;
+      chatScreenshotButton.textContent = 'Yuklanmoqda...';
+
+      try {
+        const resp = await fetch('/api/exchange/screenshot', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await resp.json().catch(() => null);
+
+        if (!resp.ok || !data || !data.ok) {
+          const msgText = (data && data.error) || 'Screenshot yuklashda xatolik yuz berdi.';
+          if (tg) tg.showAlert(msgText);
+        } else {
+          const url = data.url;
+          const sys = document.createElement('div');
+          sys.className = 'chat-message chat-message-system';
+          sys.innerHTML =
+            `<div>Siz screenshot yubordingiz.</div>
+             <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+          exchangeChatMessages.appendChild(sys);
+
+          if (exchangeChatMessages.scrollHeight) {
+            exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+          }
+        }
+      } catch (e) {
+        console.error('/api/exchange/screenshot xato:', e);
+        if (tg) tg.showAlert('Screenshot yuklashda xatolik yuz berdi.');
+      } finally {
+        chatScreenshotButton.disabled = false;
+        chatScreenshotButton.textContent = 'Screenshot yuklash';
+        chatScreenshotInput.value = '';
+      }
+    });
+  }
+
   // Yuborilgan takliflar (Men tayyorman va link) va chat linki uchun listenerlar
 
   function formatExchangeTime(iso) {
@@ -242,6 +296,8 @@
   const chatAccountsSubmit = document.getElementById('chat-accounts-submit');
   const chatMessageInput = document.getElementById('chat-message-input');
   const chatMessageSend = document.getElementById('chat-message-send');
+  const chatScreenshotInput = document.getElementById('chat-screenshot-input');
+  const chatScreenshotButton = document.getElementById('chat-screenshot-button');
   const exchangeStatus = document.getElementById('exchange-status');
 
   // Tutorial elementlari
