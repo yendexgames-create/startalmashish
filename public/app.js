@@ -611,6 +611,18 @@
     });
   }
 
+  // Pastki navbar tugmalari bo'limlarga o'tkazadi
+  if (navItems && navItems.length) {
+    navItems.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        if (target) {
+          switchView(target);
+        }
+      });
+    });
+  }
+
   async function loadChatMessages(onlyNew) {
     if (!currentTelegramId || !currentChatExchangeId || !exchangeChatMessages) return;
 
@@ -860,24 +872,8 @@
       // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
       const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
       if (activeChat && activeChat.partner) {
-        // Agar foydalanuvchi shu chatni avval yopgan bo'lsa, avtomatik ochmaymiz
-        let shouldShowChat = true;
-        try {
-          const closedKey = `chat_closed_${telegramId}_${activeChat.exchange_id}`;
-          const closedVal = window.localStorage.getItem(closedKey);
-          if (closedVal === '1') {
-            shouldShowChat = false;
-          }
-        } catch (e) {
-          // storage xatosini e'tiborsiz qoldiramiz
-        }
-
-        if (shouldShowChat) {
-          showExchangeChat(activeChat.partner, activeChat.exchange_id);
-        } else {
-          await loadExchangeOffers(telegramId);
-          await loadSentExchanges(telegramId);
-        }
+        // Har doim aktiv chatni avtomatik ochamiz
+        showExchangeChat(activeChat.partner, activeChat.exchange_id);
       } else {
         // Sizga kelgan va yuborgan takliflarni yuklaymiz (faqat chat yo'q bo'lsa)
         await loadExchangeOffers(telegramId);
@@ -1508,7 +1504,19 @@
 
   // --- Tugmalar uchun handlerlar ---
   if (btnStartExchange) {
-    btnStartExchange.addEventListener('click', () => {
+    btnStartExchange.addEventListener('click', async () => {
+      // Boshlashdan oldin takliflar va yuborilgan almashishlarni yangilab olamiz
+      if (currentTelegramId) {
+        try {
+          await Promise.all([
+            loadExchangeOffers(currentTelegramId),
+            loadSentExchanges(currentTelegramId)
+          ]);
+        } catch (e) {
+          console.error('Takliflarni yangilashda xato (btnStartExchange):', e);
+        }
+      }
+
       renderExchangeSlotSelection();
     });
   }
@@ -1715,13 +1723,6 @@
           console.error('/api/exchange/close_chat xato:', e);
         }
 
-        // Mahalliy flag – shu chatni avtomatik qayta ochmaslik uchun
-        const key = `chat_closed_${currentTelegramId}_${currentChatExchangeId}`;
-        try {
-          window.localStorage.setItem(key, '1');
-        } catch (e) {
-          // ignore storage errors
-        }
       }
 
       if (exchangeChatCard) {
