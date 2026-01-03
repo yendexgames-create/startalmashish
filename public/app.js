@@ -311,6 +311,22 @@
   // Hozir qaysi akkaunt uchun screenshot yuborilayotgani (1..min_accounts)
   let currentScreenshotAccountIndex = 1;
 
+  function getClosedChatStorageKey(telegramId, exchangeId) {
+    return `closed_chat_${telegramId}_${exchangeId}`;
+  }
+
+  function isChatManuallyClosed(telegramId, exchangeId) {
+    if (!telegramId || !exchangeId || !window.localStorage) return false;
+    const key = getClosedChatStorageKey(telegramId, exchangeId);
+    return window.localStorage.getItem(key) === '1';
+  }
+
+  function markChatManuallyClosed(telegramId, exchangeId) {
+    if (!telegramId || !exchangeId || !window.localStorage) return;
+    const key = getClosedChatStorageKey(telegramId, exchangeId);
+    window.localStorage.setItem(key, '1');
+  }
+
   // Screenshot yuborish: fayl tanlanganda Cloudinary orqali backendga yuborish
   if (chatScreenshotInput) {
     chatScreenshotInput.addEventListener('change', async () => {
@@ -1018,7 +1034,14 @@
       // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
       const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
       if (activeChat && activeChat.partner) {
-        // Har doim aktiv chatni avtomatik ochamiz
+        // Agar foydalanuvchi bu chatni avval qo'lda yopgan bo'lsa, uni qayta ochmaymiz
+        if (
+          currentTelegramId &&
+          activeChat.exchange_id &&
+          isChatManuallyClosed(currentTelegramId, activeChat.exchange_id)
+        ) {
+          return;
+        }
         showExchangeChat(activeChat.partner, activeChat.exchange_id);
       } else {
         // Sizga kelgan va yuborgan takliflarni yuklaymiz (faqat chat yo'q bo'lsa)
@@ -1902,11 +1925,13 @@
         }
       }
 
-      if (currentTelegramId) {
-        // Takliflar va yuborilgan takliflarni yangilab olamiz
-        await loadExchangeOffers(currentTelegramId);
-        await loadSentExchanges(currentTelegramId);
+      // Bu almashuvni qo'lda yopildi deb belgilaymiz, shunda qayta auto-open bo'lmaydi
+      if (currentTelegramId && currentChatExchangeId) {
+        markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
       }
+
+      // Hozircha faol chat yo'q
+      currentChatExchangeId = null;
     });
   }
 
