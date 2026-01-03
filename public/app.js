@@ -264,6 +264,8 @@
   let chatTimerInterval = null;
   let currentSlotsData = null;
   let currentSelectedSlotIndex = 1;
+  // Hozir qaysi akkaunt uchun screenshot yuborilayotgani (1..min_accounts)
+  let currentScreenshotAccountIndex = 1;
 
   function hideExchangeCards() {
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
@@ -666,121 +668,23 @@
         const data = await resp.json().catch(() => null);
 
         if (!resp.ok || !data || !data.ok) {
-          const msgText = (data && data.error) || 'Akkaunt sonini saqlashda xatolik yuz berdi.';
+          const msgText = (data && data.error) || 'Screenshot yuklashda xatolik yuz berdi.';
           if (tg) tg.showAlert(msgText);
-          return;
+        } else if (data && data.url) {
+          // Optimistik tarzda o'zimizga screenshot xabarini ko'rsatamiz
+          const url = data.url;
+          const markerText = `[SCREENSHOT] ${url}`;
+          appendSelfChatMessage(markerText);
         }
-
-        const msg = document.createElement('div');
-        msg.className = 'chat-message chat-message-system';
-
-        if (data.state === 'waiting_other') {
-          msg.innerHTML =
-            `<div>Siz bu bot uchun <b>${myVal}</b> ta akkaunt bor deb tanladingiz.</div>
-             <div style="margin-top:4px;">Endi sherigingiz ham nechta akkaunti borligini belgilashi kerak.</div>
-             <div style="margin-top:4px;">Iltimos, kutib turing – sherigingiz sonni kiritgandan so'ng umumiy kelishilgan son ko'rsatiladi.</div>`;
-        } else if (data.state === 'both_set') {
-          const myCount = data.my_count;
-          const otherCount = data.other_count;
-          const minAccounts = data.min_accounts;
-
-          msg.innerHTML =
-            `<div>Siz: <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
-             <div>Sherigingiz: <b>${otherCount}</b> ta akkaunt deb tanladi.</div>
-             <div style="margin-top:6px;">Adolatli bo'lishi uchun eng kichik son olinadi: <b>${minAccounts}</b> tadan start qilinadi.</div>`;
-
-          // 24 soatlik timer va qoida matni
-          if (exchangeChatTimer && typeof data.deadline_ts === 'number') {
-            const deadline = data.deadline_ts;
-
-            const ruleText =
-              '24 soat ichida ikkala tomon ham start bosib, screenshot yuborishi kerak. Agar bir tomon bajarib, ' +
-              'ikkinchi tomon 24 soat ichida bajarmasa, avval 1-ogsʻhlantirish (1 hafta blok), ikkinchi marta esa umrbod blok qoʻllanadi.';
-
-            function updateTimer() {
-              const now = Date.now();
-              const diff = deadline - now;
-
-              if (diff <= 0) {
-                exchangeChatTimer.textContent = 'Vaqt tugadi. Endi natija bo‘yicha qaror chiqariladi.';
-                if (chatTimerInterval) {
-                  clearInterval(chatTimerInterval);
-                  chatTimerInterval = null;
-                }
-                return;
-              }
-
-              const totalSeconds = Math.floor(diff / 1000);
-              const hours = Math.floor(totalSeconds / 3600);
-              const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-              const tStr = `Qolgan vaqt: ${hours} soat ${minutes} daqiqa.\n${ruleText}`;
-              exchangeChatTimer.textContent = tStr;
-            }
-
-            if (chatTimerInterval) {
-              clearInterval(chatTimerInterval);
-              chatTimerInterval = null;
-            }
-
-            updateTimer();
-            chatTimerInterval = setInterval(updateTimer, 30000); // har 30 soniyada yangilaymiz
-          }
-
-          // Akkaunt soni kelishilgandan keyin screenshot so'rovi xabari
-          if (exchangeChatMessages && chatScreenshotInput) {
-            const prompt = document.createElement('div');
-            prompt.className = 'chat-message chat-message-system';
-            prompt.innerHTML =
-              `<div>Kelishilgan son bo'yicha shu link uchun bosgan startingizni rasmga olib yuboring.</div>
-               <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">Screenshot yuklash</button>`;
-            exchangeChatMessages.appendChild(prompt);
-
-            const btn = prompt.querySelector('button');
-            if (btn) {
-              btn.addEventListener('click', () => {
-                chatScreenshotInput.click();
-              });
-            }
-
-            if (exchangeChatMessages.scrollHeight) {
-              exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
-            }
-          }
-        } else {
-          msg.textContent = 'Akkaunt soni yangilandi.';
-        }
-
-        exchangeChatMessages.appendChild(msg);
-
-        if (exchangeChatMessages.scrollHeight) {
-          exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
-        }
+        // Muvaffaqiyatda maxsus chat xabarini backend allaqachon qo'shgan, polling orqali ko'rinadi
       } catch (e) {
-        console.error('/api/exchange/accounts xato:', e);
-        if (tg) tg.showAlert('Akkaunt sonini saqlashda xatolik yuz berdi.');
+        console.error('Screenshot yuklashda xato:', e);
+        if (tg) tg.showAlert('Screenshot yuklashda xatolik yuz berdi.');
       }
     });
   }
 
-  // Oddiy chat xabarlari – backend bilan
-  if (chatMessageSend && chatMessageInput) {
-    chatMessageSend.addEventListener('click', async () => {
-      const val = (chatMessageInput.value || '').trim();
-      if (!val || !currentTelegramId || !currentChatExchangeId) return;
-
-      appendSelfChatMessage(val);
-      chatMessageInput.value = '';
-
-      try {
-        const resp = await fetch('/api/exchange/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            telegram_id: currentTelegramId,
-            exchange_id: currentChatExchangeId,
+// ...
             text: val
           })
         });
