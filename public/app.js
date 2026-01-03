@@ -314,20 +314,6 @@
          <div style="margin-top:4px;">Sherigingizning linki: <span style="word-break:break-all;">${linkText}</span></div>
          <div style="margin-top:6px;">Quyida bu bot uchun nechta akkauntingiz borligini tanlang.</div>`;
       exchangeChatMessages.appendChild(firstMsg);
-
-      const screenshotPrompt = document.createElement('div');
-      screenshotPrompt.className = 'chat-message chat-message-system';
-      screenshotPrompt.innerHTML =
-        `<div>Shu link uchun bosgan startingizni rasmga olib yuboring.</div>
-         <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">Screenshot yuklash</button>`;
-      exchangeChatMessages.appendChild(screenshotPrompt);
-
-      const inlineBtn = screenshotPrompt.querySelector('button');
-      if (inlineBtn && chatScreenshotInput) {
-        inlineBtn.addEventListener('click', () => {
-          chatScreenshotInput.click();
-        });
-      }
     }
 
     // Timer matnini tozalab qo'yamiz
@@ -391,10 +377,34 @@
       msg.innerHTML =
         `<div>Sherigingiz screenshot yubordi.</div>
          <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+      exchangeChatMessages.appendChild(msg);
+
+      // Pinned-like savol: keldi / kelmadi
+      const qa = document.createElement('div');
+      qa.className = 'chat-message chat-message-system';
+      qa.innerHTML =
+        `<div>Bu screenshot bo'yicha start keldimi?</div>
+         <div style="margin-top:6px; display:flex; gap:8px;">
+           <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
+           <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>
+         </div>`;
+      exchangeChatMessages.appendChild(qa);
+
+      const buttons = qa.querySelectorAll('button');
+      if (buttons && buttons.length === 2) {
+        const yesBtn = buttons[0];
+        const noBtn = buttons[1];
+        yesBtn.addEventListener('click', () => {
+          if (tg) tg.showAlert('"Keldi" tugmasi bosildi. (Keyin backendga bog\'laymiz)');
+        });
+        noBtn.addEventListener('click', () => {
+          if (tg) tg.showAlert('"Kelmadi" tugmasi bosildi. (Keyin backendga bog\'laymiz)');
+        });
+      }
     } else {
       msg.textContent = text;
+      exchangeChatMessages.appendChild(msg);
     }
-    exchangeChatMessages.appendChild(msg);
 
     if (exchangeChatMessages.scrollHeight) {
       exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
@@ -715,6 +725,27 @@
 
             updateTimer();
             chatTimerInterval = setInterval(updateTimer, 30000); // har 30 soniyada yangilaymiz
+          }
+
+          // Akkaunt soni kelishilgandan keyin screenshot so'rovi xabari
+          if (exchangeChatMessages && chatScreenshotInput) {
+            const prompt = document.createElement('div');
+            prompt.className = 'chat-message chat-message-system';
+            prompt.innerHTML =
+              `<div>Kelishilgan son bo'yicha shu link uchun bosgan startingizni rasmga olib yuboring.</div>
+               <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">Screenshot yuklash</button>`;
+            exchangeChatMessages.appendChild(prompt);
+
+            const btn = prompt.querySelector('button');
+            if (btn) {
+              btn.addEventListener('click', () => {
+                chatScreenshotInput.click();
+              });
+            }
+
+            if (exchangeChatMessages.scrollHeight) {
+              exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+            }
           }
         } else {
           msg.textContent = 'Akkaunt soni yangilandi.';
