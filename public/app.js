@@ -7,43 +7,6 @@
     tg.ready();
   }
 
-  // Screenshot yuborish: fayl tanlanganda Cloudinary orqali backendga yuborish
-  if (chatScreenshotInput) {
-    chatScreenshotInput.addEventListener('change', async () => {
-      const file = chatScreenshotInput.files && chatScreenshotInput.files[0];
-      if (!file || !currentTelegramId || !currentChatExchangeId) return;
-
-      const formData = new FormData();
-      formData.append('telegram_id', String(currentTelegramId));
-      formData.append('exchange_id', String(currentChatExchangeId));
-      formData.append('account_index', String(currentScreenshotAccountIndex || 1));
-      formData.append('file', file);
-
-      try {
-        const resp = await fetch('/api/exchange/screenshot', {
-          method: 'POST',
-          body: formData
-        });
-
-        const data = await resp.json().catch(() => null);
-        if (!resp.ok || !data || !data.ok || !data.url) {
-          const msgText = (data && data.error) || 'Screenshot yuborishda xatolik yuz berdi.';
-          if (tg) tg.showAlert(msgText);
-          return;
-        }
-
-        const idx = data.account_index || currentScreenshotAccountIndex || 1;
-        const text = `[SCREENSHOT ${idx}] ${data.url}`;
-        appendSelfChatMessage(text);
-      } catch (e) {
-        console.error('/api/exchange/screenshot POST xato:', e);
-        if (tg) tg.showAlert('Screenshot yuborishda xatolik yuz berdi. Keyinroq urinib ko\'ring.');
-      } finally {
-        chatScreenshotInput.value = '';
-      }
-    });
-  }
-
   async function startExchangePolling() {
     if (exchangePollInterval) return;
     if (!tg) return;
@@ -347,6 +310,43 @@
   let currentSelectedSlotIndex = 1;
   // Hozir qaysi akkaunt uchun screenshot yuborilayotgani (1..min_accounts)
   let currentScreenshotAccountIndex = 1;
+
+  // Screenshot yuborish: fayl tanlanganda Cloudinary orqali backendga yuborish
+  if (chatScreenshotInput) {
+    chatScreenshotInput.addEventListener('change', async () => {
+      const file = chatScreenshotInput.files && chatScreenshotInput.files[0];
+      if (!file || !currentTelegramId || !currentChatExchangeId) return;
+
+      const formData = new FormData();
+      formData.append('telegram_id', String(currentTelegramId));
+      formData.append('exchange_id', String(currentChatExchangeId));
+      formData.append('account_index', String(currentScreenshotAccountIndex || 1));
+      formData.append('file', file);
+
+      try {
+        const resp = await fetch('/api/exchange/screenshot', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data || !data.ok || !data.url) {
+          const msgText = (data && data.error) || 'Screenshot yuborishda xatolik yuz berdi.';
+          if (tg) tg.showAlert(msgText);
+          return;
+        }
+
+        const idx = data.account_index || currentScreenshotAccountIndex || 1;
+        const text = `[SCREENSHOT ${idx}] ${data.url}`;
+        appendSelfChatMessage(text);
+      } catch (e) {
+        console.error('/api/exchange/screenshot POST xato:', e);
+        if (tg) tg.showAlert('Screenshot yuborishda xatolik yuz berdi. Keyinroq urinib ko\'ring.');
+      } finally {
+        chatScreenshotInput.value = '';
+      }
+    });
+  }
 
   function hideExchangeCards() {
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'none';
