@@ -7,49 +7,6 @@
     tg.ready();
   }
 
-  // Screenshot yuklash – Cloudinary orqali backendga
-  if (chatScreenshotButton && chatScreenshotInput && exchangeChatMessages) {
-    chatScreenshotButton.addEventListener('click', () => {
-      chatScreenshotInput.click();
-    });
-
-    chatScreenshotInput.addEventListener('change', async () => {
-      const file = chatScreenshotInput.files && chatScreenshotInput.files[0];
-      if (!file || !currentTelegramId || !currentChatExchangeId) return;
-
-      const formData = new FormData();
-      formData.append('telegram_id', String(currentTelegramId));
-      formData.append('exchange_id', String(currentChatExchangeId));
-      formData.append('account_index', '1');
-      formData.append('file', file);
-
-      chatScreenshotButton.disabled = true;
-      chatScreenshotButton.textContent = 'Yuklanmoqda...';
-
-      try {
-        const resp = await fetch('/api/exchange/screenshot', {
-          method: 'POST',
-          body: formData
-        });
-
-        const data = await resp.json().catch(() => null);
-
-        if (!resp.ok || !data || !data.ok) {
-          const msgText = (data && data.error) || 'Screenshot yuklashda xatolik yuz berdi.';
-          if (tg) tg.showAlert(msgText);
-        }
-        // Muvaffaqiyatda maxsus chat xabarini backend allaqachon qo'shgan, polling orqali ko'rinadi
-      } catch (e) {
-        console.error('/api/exchange/screenshot xato:', e);
-        if (tg) tg.showAlert('Screenshot yuklashda xatolik yuz berdi.');
-      } finally {
-        chatScreenshotButton.disabled = false;
-        chatScreenshotButton.textContent = 'Screenshot yuklash';
-        chatScreenshotInput.value = '';
-      }
-    });
-  }
-
   // Yuborilgan takliflar (Men tayyorman va link) va chat linki uchun listenerlar
 
   function formatExchangeTime(iso) {
