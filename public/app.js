@@ -37,19 +37,8 @@
         if (!resp.ok || !data || !data.ok) {
           const msgText = (data && data.error) || 'Screenshot yuklashda xatolik yuz berdi.';
           if (tg) tg.showAlert(msgText);
-        } else {
-          const url = data.url;
-          const sys = document.createElement('div');
-          sys.className = 'chat-message chat-message-system';
-          sys.innerHTML =
-            `<div>Siz screenshot yubordingiz.</div>
-             <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
-          exchangeChatMessages.appendChild(sys);
-
-          if (exchangeChatMessages.scrollHeight) {
-            exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
-          }
         }
+        // Muvaffaqiyatda maxsus chat xabarini backend allaqachon qo'shgan, polling orqali ko'rinadi
       } catch (e) {
         console.error('/api/exchange/screenshot xato:', e);
         if (tg) tg.showAlert('Screenshot yuklashda xatolik yuz berdi.');
@@ -397,9 +386,20 @@
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    const isScreenshot = trimmed.startsWith('[SCREENSHOT]');
+
     const msg = document.createElement('div');
     msg.className = 'chat-message chat-message-self';
-    msg.textContent = trimmed;
+
+    if (isScreenshot) {
+      const url = trimmed.replace('[SCREENSHOT]', '').trim();
+      msg.innerHTML =
+        `<div>Siz screenshot yubordingiz.</div>
+         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+    } else {
+      msg.textContent = trimmed;
+    }
+
     exchangeChatMessages.appendChild(msg);
 
     if (exchangeChatMessages.scrollHeight) {
@@ -413,7 +413,16 @@
     msg.className = 'chat-message chat-message-partner';
 
     const text = baseText && baseText.trim() ? baseText.trim() : 'OK, kelishdik.';
-    msg.textContent = text;
+    const isScreenshot = text.startsWith('[SCREENSHOT]');
+
+    if (isScreenshot) {
+      const url = text.replace('[SCREENSHOT]', '').trim();
+      msg.innerHTML =
+        `<div>Sherigingiz screenshot yubordi.</div>
+         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+    } else {
+      msg.textContent = text;
+    }
     exchangeChatMessages.appendChild(msg);
 
     if (exchangeChatMessages.scrollHeight) {

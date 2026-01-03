@@ -223,6 +223,20 @@ app.post('/api/exchange/screenshot', upload.single('file'), async (req, res) => 
       );
     });
 
+    // Chat tarixida ham maxsus screenshot xabarini saqlaymiz
+    const screenshotText = `[SCREENSHOT] ${imageUrl}`;
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
+        [exId, userId, screenshotText, now],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
     return res.json({ ok: true, url: imageUrl, account_index: accountIndex });
   } catch (e) {
     console.error('/api/exchange/screenshot xato:', e);
