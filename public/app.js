@@ -310,6 +310,9 @@
   let currentSelectedSlotIndex = 1;
   // Hozir qaysi akkaunt uchun screenshot yuborilayotgani (1..min_accounts)
   let currentScreenshotAccountIndex = 1;
+  // Akkaunt soni kelishilganda, sherikni kutish uchun polling intervali
+  let chatAccountsPollInterval = null;
+  let lastAccountsCount = null;
 
   function getClosedChatStorageKey(telegramId, exchangeId) {
     return `closed_chat_${telegramId}_${exchangeId}`;
@@ -821,10 +824,20 @@
 
   // Akkaunt soni bo'yicha kelishish – backend bilan
   if (chatAccountsSubmit && chatAccountsSelect && exchangeChatMessages) {
-    chatAccountsSubmit.addEventListener('click', async () => {
+    chatAccountsSubmit.addEventListener('click', async (e) => {
+      e.preventDefault();
       if (!currentTelegramId || !currentChatExchangeId) return;
 
       const myVal = parseInt(chatAccountsSelect.value, 10) || 1;
+
+      // Oxirgi yuborilgan akkaunt sonini eslab qolamiz
+      lastAccountsCount = myVal;
+
+      // Eski pollingni to'xtatib yuboramiz
+      if (chatAccountsPollInterval) {
+        clearInterval(chatAccountsPollInterval);
+        chatAccountsPollInterval = null;
+      }
 
       try {
         const resp = await fetch('/api/exchange/accounts', {
@@ -860,6 +873,109 @@
           msg.innerHTML =
             `<div>Siz <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
              <div>Sherigingiz hali javob bermadi. Uning ham nechta akkaunti borligini kutyapmiz.</div>`;
+
+          // Sherik ham sonni kiritganini tekshirish uchun avtomatik polling boshlaymiz
+          if (!chatAccountsPollInterval && lastAccountsCount && currentTelegramId && currentChatExchangeId) {
+            chatAccountsPollInterval = setInterval(async () => {
+              try {
+                const pollResp = await fetch('/api/exchange/accounts', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    telegram_id: currentTelegramId,
+                    exchange_id: currentChatExchangeId,
+                    count: lastAccountsCount
+                  })
+                });
+
+                const pollData = await pollResp.json().catch(() => null);
+                if (!pollResp.ok || !pollData || !pollData.ok) return;
+
+                if (pollData.state === 'both_set') {
+                  clearInterval(chatAccountsPollInterval);
+                  chatAccountsPollInterval = null;
+
+                  const pollMy = pollData.my_count;
+                  const pollOther = pollData.other_count;
+                  const pollMin = pollData.min_accounts;
+                  const pollDeadline = pollData.deadline_ts;
+
+                  const info = document.createElement('div');
+                  info.className = 'chat-message chat-message-system';
+                  info.innerHTML =
+                    `<div>Siz: <b>${pollMy}</b> ta akkaunt deb tanladingiz.</div>
+                     <div>Sherigingiz: <b>${pollOther}</b> ta akkaunt deb tanladi.</div>
+                     <div style="margin-top:6px;">Adolatli bo'lishi uchun eng kichik son olinadi: <b>${pollMin}</b> tadan start qilinadi.</div>`;
+                  exchangeChatMessages.appendChild(info);
+
+                  // Formani yopamiz
+                  if (chatAccountsArea) {
+                    chatAccountsArea.style.display = 'none';
+                  }
+
+                  // Timer
+                  if (pollDeadline && exchangeChatTimer) {
+                    const deadline = new Date(pollDeadline);
+
+                    function updateTimer() {
+                      const now2 = new Date();
+                      const diffMs2 = deadline.getTime() - now2.getTime();
+                      if (diffMs2 <= 0) {
+                        exchangeChatTimer.textContent =
+                          'Tayyorlash uchun ajratilgan 24 soat tugadi. Barcha startlar yakunlangan bo‘lishi kerak.';
+                        if (chatTimerInterval) {
+                          clearInterval(chatTimerInterval);
+                          chatTimerInterval = null;
+                        }
+                        return;
+                      }
+
+                      const diffMinTotal2 = Math.floor(diffMs2 / 60000);
+                      const hours2 = Math.floor(diffMinTotal2 / 60);
+                      const mins2 = diffMinTotal2 % 60;
+                      exchangeChatTimer.textContent = `Qolgan vaqt: ${hours2} soat ${mins2} daqiqa. Ikkala tomon ham startlarni shu vaqt ichida bosishi kerak.`;
+                    }
+
+                    if (chatTimerInterval) {
+                      clearInterval(chatTimerInterval);
+                      chatTimerInterval = null;
+                    }
+
+                    updateTimer();
+                    chatTimerInterval = setInterval(updateTimer, 30000);
+                  }
+
+                  // Screenshot so'rovlari
+                  if (exchangeChatMessages && chatScreenshotInput && typeof pollMin === 'number' && pollMin > 0) {
+                    for (let i = 1; i <= pollMin; i += 1) {
+                      const prompt = document.createElement('div');
+                      prompt.className = 'chat-message chat-message-system';
+                      prompt.innerHTML =
+                        `<div>${i}-akkaunt uchun shu linkdan bosgan startingizni rasmga olib yuboring.</div>
+                         <button type="button" class="primary-btn" style="margin-top:6px; width:100%;">${i}-akkauntdan screenshot yuklash</button>`;
+                      exchangeChatMessages.appendChild(prompt);
+
+                      const btn = prompt.querySelector('button');
+                      if (btn) {
+                        btn.addEventListener('click', () => {
+                          currentScreenshotAccountIndex = i;
+                          chatScreenshotInput.click();
+                        });
+                      }
+                    }
+
+                    if (exchangeChatMessages.scrollHeight) {
+                      exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+                    }
+                  }
+                }
+              } catch (pollErr) {
+                console.error('/api/exchange/accounts polling xato:', pollErr);
+              }
+            }, 5000);
+          }
         } else if (state === 'both_set') {
           msg.innerHTML =
             `<div>Siz: <b>${myCount}</b> ta akkaunt deb tanladingiz.</div>
