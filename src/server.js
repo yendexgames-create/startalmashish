@@ -615,16 +615,14 @@ app.post('/api/exchange/close_chat', async (req, res) => {
       return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi yoki chat holatida emas' });
     }
 
-    // Agar holat chat ruxsat etilgan bo'lsa (ready_chat yoki waiting_screenshots), completed ga o'zgartiramiz.
-    // Aks holda hech narsa o'zgartirmaymiz, lekin baribir ok:true qaytaramiz.
-    if (ex.status === 'ready_chat' || ex.status === 'waiting_screenshots') {
-      await new Promise((resolve, reject) => {
-        db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
+    // Har qanday joriy statusdan qat'i nazar, bu almashuvni yakunlangan (completed) deb belgilaymiz,
+    // shunda /api/exchange/active_chat uni qayta qaytarmaydi.
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
+        if (err) return reject(err);
+        resolve();
       });
-    }
+    });
 
     return res.json({ ok: true });
   } catch (e) {
