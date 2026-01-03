@@ -707,6 +707,56 @@
     }
   }
 
+  // Chat xabar yuborish (button va Enter)
+  function sendChatMessage() {
+    if (!chatMessageInput || !exchangeChatMessages) return;
+    const val = (chatMessageInput.value || '').trim();
+    if (!val || !currentTelegramId || !currentChatExchangeId) return;
+
+    appendSelfChatMessage(val);
+    chatMessageInput.value = '';
+
+    fetch('/api/exchange/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        telegram_id: currentTelegramId,
+        exchange_id: currentChatExchangeId,
+        text: val
+      })
+    })
+      .then((resp) => resp.json().catch(() => null).then((data) => ({ resp, data })))
+      .then(({ resp, data }) => {
+        if (resp.ok && data && data.message && typeof data.message.id === 'number') {
+          if (data.message.id > chatLastMessageId) {
+            chatLastMessageId = data.message.id;
+          }
+        } else if (!resp.ok && tg) {
+          const msg = (data && data.error) || 'Xabar yuborishda xatolik yuz berdi.';
+          tg.showAlert(msg);
+        }
+      })
+      .catch((err) => {
+        console.error('/api/exchange/messages POST xato:', err);
+      });
+  }
+
+  if (chatMessageSend && chatMessageInput) {
+    chatMessageSend.addEventListener('click', (e) => {
+      e.preventDefault();
+      sendChatMessage();
+    });
+
+    chatMessageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+
   // Akkaunt soni bo'yicha kelishish – backend bilan
   if (chatAccountsSubmit && chatAccountsSelect && exchangeChatMessages) {
     chatAccountsSubmit.addEventListener('click', async () => {
