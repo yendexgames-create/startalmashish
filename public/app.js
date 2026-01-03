@@ -663,7 +663,15 @@
             exchange_id: currentChatExchangeId,
             count: myVal
           })
-      }
+        });
+
+        const data = await resp.json().catch(() => null);
+
+        if (!resp.ok || !data || !data.ok) {
+          const msgText = (data && data.error) || 'Akkaunt sonini saqlashda xatolik yuz berdi.';
+          if (tg) tg.showAlert(msgText);
+          return;
+        }
 
       const state = data.state;
       const myCount = data.my_count;
