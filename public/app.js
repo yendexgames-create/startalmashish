@@ -7,6 +7,48 @@
     tg.ready();
   }
 
+  async function startExchangePolling() {
+    if (exchangePollInterval) return;
+    if (!tg) return;
+
+    exchangePollInterval = setInterval(async () => {
+      if (!currentTelegramId) return;
+      try {
+        await Promise.all([
+          loadExchangeOffers(currentTelegramId),
+          loadSentExchanges(currentTelegramId)
+        ]);
+      } catch (e) {
+        console.error('exchange polling xato:', e);
+      }
+    }, 10000); // har 10 soniyada yangilaymiz
+  }
+
+  async function startActiveChatPolling() {
+    if (!tg || !currentTelegramId) return;
+    if (activeChatPollInterval) return;
+
+    activeChatPollInterval = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/exchange/active_chat?telegram_id=${currentTelegramId}`);
+        if (!resp.ok) return;
+        const data = await resp.json().catch(() => null);
+        if (!data || !data.active || !data.active.partner || !data.active.exchange_id) return;
+
+        const active = data.active;
+
+        if (active && active.partner && active.exchange_id) {
+          // Topildi, pollingni to'xtatamiz va chatni ochamiz
+          clearInterval(activeChatPollInterval);
+          activeChatPollInterval = null;
+          showExchangeChat(active.partner, active.exchange_id);
+        }
+      } catch (e) {
+        console.error('active_chat polling xato:', e);
+      }
+    }, 4000); // har 4 soniyada tekshiramiz
+  }
+
   // Yuborilgan takliflar (Men tayyorman va link) va chat linki uchun listenerlar
 
   function formatExchangeTime(iso) {
@@ -262,6 +304,8 @@
   let chatLastMessageId = 0;
   let chatPollInterval = null;
   let chatTimerInterval = null;
+  let activeChatPollInterval = null;
+  let exchangePollInterval = null;
   let currentSlotsData = null;
   let currentSelectedSlotIndex = 1;
   // Hozir qaysi akkaunt uchun screenshot yuborilayotgani (1..min_accounts)
@@ -284,6 +328,12 @@
   }
 
   function showExchangeChat(partner, exchangeId) {
+    // Agar aktiv chatni polling qilayotgan bo'lsak, endi to'xtatamiz
+    if (activeChatPollInterval) {
+      clearInterval(activeChatPollInterval);
+      activeChatPollInterval = null;
+    }
+
     currentChatExchangeId = exchangeId;
     hideExchangeCards();
 
@@ -878,7 +928,13 @@
         // Sizga kelgan va yuborgan takliflarni yuklaymiz (faqat chat yo'q bo'lsa)
         await loadExchangeOffers(telegramId);
         await loadSentExchanges(telegramId);
+
+        // Hozircha chat yo'q – keyinchalik paydo bo'lsa, avtomatik ochish uchun polling boshlaymiz
+        await startActiveChatPolling();
       }
+
+      // Takliflar ro'yxatini ham fonda yangilab turamiz
+      await startExchangePolling();
 
       // Bosh sahifadagi mini profil va tile matnlarini to'ldirish
       if (homeUsername) {
@@ -1698,6 +1754,11 @@
       if (chatTimerInterval) {
         clearInterval(chatTimerInterval);
         chatTimerInterval = null;
+      }
+
+      if (activeChatPollInterval) {
+        clearInterval(activeChatPollInterval);
+        activeChatPollInterval = null;
       }
 
       // Avval backendga chat yopilgani haqida xabar beramiz
