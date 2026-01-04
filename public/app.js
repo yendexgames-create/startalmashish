@@ -484,6 +484,54 @@
     const text = baseText && baseText.trim() ? baseText.trim() : 'OK, kelishdik.';
     const isScreenshot = text.startsWith('[SCREENSHOT');
 
+    // System xabarlar uchun maxsus ishlov
+    if (text === '[SYSTEM] CHAT_CLOSED') {
+      msg.className = 'chat-message chat-message-system';
+      msg.textContent = 'Sherigingiz chatni tark etdi. Chat yopildi.';
+      exchangeChatMessages.appendChild(msg);
+
+      // Sherik chatni yopgan – frontdagi chatni ham tozalaymiz
+      if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+        chatPollInterval = null;
+      }
+      if (chatTimerInterval) {
+        clearInterval(chatTimerInterval);
+        chatTimerInterval = null;
+      }
+      if (chatAccountsPollInterval) {
+        clearInterval(chatAccountsPollInterval);
+        chatAccountsPollInterval = null;
+      }
+
+      // Bu almashuvni qo'lda yopilgan deb belgilaymiz, shunda qayta auto-open bo'lmaydi
+      if (currentTelegramId && currentChatExchangeId) {
+        markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
+      }
+
+      // Chat kartasini yopib, asosiy almashish ko'rinishini qayta ko'rsatamiz
+      if (exchangeChatCard) exchangeChatCard.style.display = 'none';
+      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+      if (exchangeCard) exchangeCard.style.display = 'none';
+
+      // Takliflar ro'yxatini yangilab olamiz
+      if (currentTelegramId) {
+        Promise.all([
+          loadExchangeOffers(currentTelegramId),
+          loadSentExchanges(currentTelegramId)
+        ]).catch((e) => console.error('Sherik chatni yopganda takliflarni yangilash xato:', e));
+      }
+
+      // Faol chat yo'q deb belgilaymiz
+      currentChatExchangeId = null;
+
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+
+      return;
+    }
+
     if (isScreenshot) {
       const match = text.match(/^\[SCREENSHOT(?:\s+(\d+))?\]\s+(.+)$/);
       const accountIndex = match && match[1] ? parseInt(match[1], 10) : null;

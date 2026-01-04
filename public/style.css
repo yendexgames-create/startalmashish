@@ -276,6 +276,63 @@ body {
   margin-bottom: 8px;
 }
 
+/* Chatdagi 24 soatlik taymer dizayni */
+.chat-timer-text {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #e5e7eb;
+  opacity: 0.9;
+}
+
+.chat-timer-bar {
+  margin-top: 4px;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(31, 41, 55, 0.9);
+  overflow: hidden;
+}
+
+.chat-timer-bar-inner {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.6);
+  transition: width 0.5s linear, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.chat-timer-ok .chat-timer-bar-inner {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+}
+
+.chat-timer-warn .chat-timer-bar-inner {
+  background: linear-gradient(90deg, #facc15, #f97316);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.6);
+}
+
+.chat-timer-danger .chat-timer-bar-inner {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
+  animation: timer-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0% {
+    transform: scaleX(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scaleX(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0.9;
+  }
+}
+
 .exchange-user {
   display: flex;
   align-items: center;

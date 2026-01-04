@@ -51,6 +51,83 @@ function findUserByTelegramId(telegramId) {
   });
 }
 
+// Screenshot yuborish qoidalariga qarab foydalanuvchini bloklash uchun yordamchi
+async function checkAndApplyScreenshotPenalty(telegramId) {
+  if (!telegramId) return;
+
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) return;
+  if (user.permanent_block) return; // Allaqachon cheksiz bloklangan
+
+  const now = Date.now();
+
+  // Deadline tugagan almashuvlar: faqat bitta taraf screenshot yuborgan
+  const offendingExchanges = await new Promise((resolve, reject) => {
+    db.all(
+      `SELECT * FROM exchanges
+       WHERE deadline IS NOT NULL
+         AND deadline > 0
+         AND deadline < ?
+         AND (user1_id = ? OR user2_id = ?)
+         AND (
+           (user1_screenshot_received = 1 AND user2_screenshot_received = 0)
+           OR (user1_screenshot_received = 0 AND user2_screenshot_received = 1)
+         )`,
+      [now, telegramId, telegramId],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+
+  if (!offendingExchanges.length) return;
+
+  // Agar foydalanuvchi ushbu almashuvlarda screenshot yubormagan taraf bo'lsa – penalty
+  let shouldPenalize = false;
+  offendingExchanges.forEach((ex) => {
+    const isUser1 = ex.user1_id === telegramId;
+    const myReceived = isUser1 ? ex.user1_screenshot_received : ex.user2_screenshot_received;
+    const otherReceived = isUser1 ? ex.user2_screenshot_received : ex.user1_screenshot_received;
+    if (!myReceived && otherReceived) {
+      shouldPenalize = true;
+    }
+  });
+
+  if (!shouldPenalize) return;
+
+  // 1-marta: 1 haftaga blok; 2-marta: cheksiz blok
+  const hasAnyTempBlock = user.block_until && Number.isFinite(user.block_until);
+
+  if (hasAnyTempBlock) {
+    // Ikkinchi va undan keyingi qoidabuzarliklar – cheksiz blok
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE users SET permanent_block = 1 WHERE telegram_id = ?',
+        [telegramId],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+  } else {
+    // Birinchi marta – 7 kunlik blok
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const blockUntil = now + weekMs;
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE users SET block_until = ? WHERE telegram_id = ?',
+        [blockUntil, telegramId],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+  }
+}
+
 let cachedBotUsername = null;
 async function getBotUsername() {
   if (cachedBotUsername) return cachedBotUsername;
@@ -125,9 +202,13 @@ function getFriendsForUser(telegramId) {
 app.get('/api/me', async (req, res) => {
   try {
     const telegramId = parseInt(req.query.telegram_id, 10);
+
     if (!telegramId) {
-      return res.status(400).json({ error: 'telegram_id query param kerak' });
+      return res.status(400).json({ error: 'telegram_id query parametr kerak' });
     }
+
+    // WebApp ochilganda screenshot qoidalarini buzgan foydalanuvchilar uchun bloklashni tekshiramiz
+    await checkAndApplyScreenshotPenalty(telegramId);
 
     const user = await findUserByTelegramId(telegramId);
     if (!user) {
@@ -231,6 +312,21 @@ app.post('/api/exchange/screenshot', upload.single('file'), async (req, res) => 
       db.run(
         'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
         [exId, userId, screenshotText, now],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
+    // Ushbu almashuv uchun qaysi taraf screenshot yuborganini belgilab qo'yamiz
+    const isUser1 = ex.user1_id === userId;
+    const myField = isUser1 ? 'user1_screenshot_received' : 'user2_screenshot_received';
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE exchanges SET ${myField} = 1 WHERE id = ?`,
+        [exId],
         (err) => {
           if (err) return reject(err);
           resolve();
@@ -615,6 +711,17 @@ app.post('/api/exchange/close_chat', async (req, res) => {
       return res.status(400).json({ error: 'Bu almashish siz uchun amal qilmaydi yoki chat holatida emas' });
     }
 
+    const now = Date.now();
+    const isUser1 = ex.user1_id === userId;
+    const myReceived = isUser1 ? ex.user1_screenshot_received : ex.user2_screenshot_received;
+    const otherReceived = isUser1 ? ex.user2_screenshot_received : ex.user1_screenshot_received;
+
+    // Agar sherik screenshot yuborgan, siz yubormagan bo'lsangiz va deadline hali tugamagan bo'lsa –
+    // chatni yopishga ruxsat bermaymiz.
+    if (!myReceived && otherReceived && ex.deadline && ex.deadline > now) {
+      return res.status(400).json({ error: 'Siz hali screenshot yubormadingiz.' });
+    }
+
     // Har qanday joriy statusdan qat'i nazar, bu almashuvni yakunlangan (completed) deb belgilaymiz,
     // shunda /api/exchange/active_chat uni qayta qaytarmaydi.
     await new Promise((resolve, reject) => {
@@ -622,6 +729,18 @@ app.post('/api/exchange/close_chat', async (req, res) => {
         if (err) return reject(err);
         resolve();
       });
+    });
+
+    // Sherik tomoni uchun ham chat yopilganini ko'rsatish uchun system xabar qo'shamiz
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
+        [exId, userId, '[SYSTEM] CHAT_CLOSED', now],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
     });
 
     return res.json({ ok: true });
