@@ -280,6 +280,7 @@
   const exchangeChatClose = document.getElementById('exchange-chat-close');
   const exchangeChatMessages = document.getElementById('exchange-chat-messages');
   const chatAccountsArea = document.getElementById('exchange-chat-accounts-area');
+  const chatConfirmArea = document.getElementById('exchange-chat-confirm-area');
   const chatAccountsSelect = document.getElementById('chat-accounts-select');
   const chatAccountsSubmit = document.getElementById('chat-accounts-submit');
   const chatMessageInput = document.getElementById('chat-message-input');
@@ -547,9 +548,22 @@
       return;
     }
 
-    if (text === '[SYSTEM] REJECTED') {
+    if (text.startsWith('[SYSTEM] REJECTED')) {
       msg.className = 'chat-message chat-message-system';
-      msg.textContent = 'Sizni start qabul qilinmadi, qayta urinib ko\'ring.';
+
+      let accountIndex = null;
+      const m = text.match(/^\[SYSTEM\]\s+REJECTED\s+(\d+)/);
+      if (m && m[1]) {
+        accountIndex = parseInt(m[1], 10);
+      }
+
+      if (accountIndex) {
+        // Shu account uchun qayta screenshot yuborish imkonini beramiz
+        currentScreenshotAccountIndex = accountIndex;
+        msg.textContent = `${accountIndex}-akkauntdagi startingiz qabul qilinmadi, qayta urinib ko'ring.`;
+      } else {
+        msg.textContent = 'Sizni start qabul qilinmadi, qayta urinib ko\'ring.';
+      }
       exchangeChatMessages.appendChild(msg);
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
@@ -561,41 +575,42 @@
       msg.className = 'chat-message chat-message-system';
       msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi. Chat yopildi.';
       exchangeChatMessages.appendChild(msg);
-
-      // Muvaffaqiyatli almashuv – chatni tozalaymiz
-      if (chatPollInterval) {
-        clearInterval(chatPollInterval);
-        chatPollInterval = null;
-      }
-      if (chatTimerInterval) {
-        clearInterval(chatTimerInterval);
-        chatTimerInterval = null;
-      }
-      if (chatAccountsPollInterval) {
-        clearInterval(chatAccountsPollInterval);
-        chatAccountsPollInterval = null;
-      }
-
-      if (currentTelegramId && currentChatExchangeId) {
-        markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
-      }
-
-      if (exchangeChatCard) exchangeChatCard.style.display = 'none';
-      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
-      if (exchangeCard) exchangeCard.style.display = 'none';
-
-      if (currentTelegramId) {
-        Promise.all([
-          loadExchangeOffers(currentTelegramId),
-          loadSentExchanges(currentTelegramId)
-        ]).catch((e) => console.error('EXCHANGE_SUCCESS dan keyin takliflarni yangilash xato:', e));
-      }
-
-      currentChatExchangeId = null;
-
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
       }
+
+      // Muvaffaqiyat xabarini foydalanuvchi ko'ra olishi uchun kichik pauza bilan yopamiz
+      setTimeout(() => {
+        if (chatPollInterval) {
+          clearInterval(chatPollInterval);
+          chatPollInterval = null;
+        }
+        if (chatTimerInterval) {
+          clearInterval(chatTimerInterval);
+          chatTimerInterval = null;
+        }
+        if (chatAccountsPollInterval) {
+          clearInterval(chatAccountsPollInterval);
+          chatAccountsPollInterval = null;
+        }
+
+        if (currentTelegramId && currentChatExchangeId) {
+          markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
+        }
+
+        if (exchangeChatCard) exchangeChatCard.style.display = 'none';
+        if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+        if (exchangeCard) exchangeCard.style.display = 'none';
+
+        if (currentTelegramId) {
+          Promise.all([
+            loadExchangeOffers(currentTelegramId),
+            loadSentExchanges(currentTelegramId)
+          ]).catch((e) => console.error('EXCHANGE_SUCCESS dan keyin takliflarni yangilash xato:', e));
+        }
+
+        currentChatExchangeId = null;
+      }, 2500);
 
       return;
     }
@@ -659,21 +674,22 @@
          <div style="margin-top:6px;"><img src="${url}" alt="Screenshot" style="max-width:100%; border-radius:8px;" /></div>`;
       exchangeChatMessages.appendChild(msg);
 
-      // Pinned-like savol: keldi / kelmadi
-      const qa = document.createElement('div');
-      qa.className = 'chat-message chat-message-system';
-      const questionLabel = accountIndex
-        ? `${accountIndex}-akkauntdan kelgan start bormi?`
-        : 'Bu screenshot bo\'yicha start keldimi?';
-      qa.innerHTML =
-        `<div>${questionLabel}</div>
-         <div style="margin-top:6px; display:flex; gap:8px;">
-           <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
-           <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>
-         </div>`;
-      exchangeChatMessages.appendChild(qa);
+      // Pinned-like savol: keldi / kelmadi – chat inputining tepasidagi maxsus zonada ko'rsatamiz
+      if (chatConfirmArea) {
+        const questionLabel = accountIndex
+          ? `${accountIndex}-akkauntdan kelgan start bormi?`
+          : 'Bu screenshot bo\'yicha start keldimi?';
 
-      const buttons = qa.querySelectorAll('button');
+        chatConfirmArea.innerHTML =
+          `<div class="chat-input-label">${questionLabel}</div>
+           <div class="chat-input-row" style="margin-top:6px; display:flex; gap:8px;">
+             <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
+             <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>
+           </div>`;
+        chatConfirmArea.style.display = 'block';
+      }
+
+      const buttons = chatConfirmArea ? chatConfirmArea.querySelectorAll('button') : null;
       if (buttons && buttons.length === 2 && currentTelegramId && currentChatExchangeId) {
         const yesBtn = buttons[0];
         const noBtn = buttons[1];
@@ -683,8 +699,13 @@
           noBtn.disabled = true;
         };
 
-        const markAnswered = (textLabel) => {
-          qa.innerHTML = `<div>${questionLabel}</div><div style="margin-top:6px; font-size:0.85rem; color:#d1d5db;">${textLabel}</div>`;
+        const hideConfirmArea = (textLabel) => {
+          if (!chatConfirmArea) return;
+          chatConfirmArea.innerHTML = `<div class="chat-input-label" style="font-size:0.85rem; color:#d1d5db;">${textLabel}</div>`;
+          setTimeout(() => {
+            chatConfirmArea.style.display = 'none';
+            chatConfirmArea.innerHTML = '';
+          }, 1500);
         };
 
         yesBtn.addEventListener('click', () => {
@@ -695,7 +716,8 @@
             body: JSON.stringify({
               telegram_id: currentTelegramId,
               exchange_id: currentChatExchangeId,
-              decision: 'keldi'
+              decision: 'keldi',
+              account_index: accountIndex || null
             })
           })
             .then((resp) => resp.json().catch(() => ({})))
@@ -706,7 +728,7 @@
                 noBtn.disabled = false;
                 return;
               }
-              markAnswered('Siz bu startni "keldi" deb belgiladingiz.');
+              hideConfirmArea('Siz bu startni "keldi" deb belgiladingiz.');
 
               // Agar ikkala tomon ham "Keldi" bosib bo'lgan bo'lsa, backend completed=true qaytaradi
               // va biz shu yerdan yakuniy muvaffaqiyat xabarini chiqaramiz
@@ -730,7 +752,8 @@
             body: JSON.stringify({
               telegram_id: currentTelegramId,
               exchange_id: currentChatExchangeId,
-              decision: 'kelmadi'
+              decision: 'kelmadi',
+              account_index: accountIndex || null
             })
           })
             .then((resp) => resp.json().catch(() => ({})))
@@ -741,7 +764,7 @@
                 noBtn.disabled = false;
                 return;
               }
-              markAnswered('Siz bu startni "kelmadi" deb belgiladingiz.');
+              hideConfirmArea('Siz bu startni "kelmadi" deb belgiladingiz.');
             })
             .catch((e) => {
               console.error('approve kelmadi xato:', e);

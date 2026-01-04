@@ -241,7 +241,7 @@ app.get('/api/me', async (req, res) => {
 // Keldi / Kelmadi tasdiqlash
 app.post('/api/exchange/approve', async (req, res) => {
   try {
-    const { telegram_id, exchange_id, decision } = req.body || {};
+    const { telegram_id, exchange_id, decision, account_index } = req.body || {};
 
     const userId = parseInt(telegram_id, 10);
     const exId = parseInt(exchange_id, 10);
@@ -287,10 +287,20 @@ app.post('/api/exchange/approve', async (req, res) => {
           }
         );
       });
-      systemText = '[SYSTEM] APPROVED';
+      const accIdx = parseInt(account_index, 10);
+      if (Number.isFinite(accIdx) && accIdx > 0) {
+        systemText = `[SYSTEM] APPROVED ${accIdx}`;
+      } else {
+        systemText = '[SYSTEM] APPROVED';
+      }
     } else {
       // Foydalanuvchi sherik startini rad etdi
-      systemText = '[SYSTEM] REJECTED';
+      const accIdx = parseInt(account_index, 10);
+      if (Number.isFinite(accIdx) && accIdx > 0) {
+        systemText = `[SYSTEM] REJECTED ${accIdx}`;
+      } else {
+        systemText = '[SYSTEM] REJECTED';
+      }
     }
 
     await new Promise((resolve, reject) => {
