@@ -314,6 +314,128 @@
   // Akkaunt soni kelishilganda, sherikni kutish uchun polling intervali
   let chatAccountsPollInterval = null;
   let lastAccountsCount = null;
+  // Sherikdan kelgan screenshotlar bo'yicha keldi/kelmadi savollari uchun navbat
+  const pendingConfirmQueue = [];
+
+  function enqueueConfirm(accountIndex) {
+    if (!accountIndex) return;
+    pendingConfirmQueue.push({ accountIndex });
+    // Agar hozir hech qanday savol ko'rsatilmayotgan bo'lsa, darhol boshlaymiz
+    if (chatConfirmArea && chatConfirmArea.style.display !== 'block') {
+      showNextConfirm();
+    }
+  }
+
+  function showNextConfirm() {
+    if (!chatConfirmArea) return;
+    if (!pendingConfirmQueue.length) {
+      chatConfirmArea.style.display = 'none';
+      chatConfirmArea.innerHTML = '';
+      return;
+    }
+
+    const item = pendingConfirmQueue[0];
+    const accountIndex = item.accountIndex;
+
+    const questionLabel = accountIndex
+      ? `${accountIndex}-akkauntdan kelgan start bormi?`
+      : 'Bu screenshot bo\'yicha start keldimi?';
+
+    chatConfirmArea.innerHTML =
+      `<div class="chat-input-label">${questionLabel}</div>
+       <div class="chat-input-row" style="margin-top:6px; display:flex; gap:8px;">
+         <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
+         <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>
+       </div>`;
+    chatConfirmArea.style.display = 'block';
+
+    const buttons = chatConfirmArea.querySelectorAll('button');
+    if (!(buttons && buttons.length === 2 && currentTelegramId && currentChatExchangeId)) return;
+
+    const yesBtn = buttons[0];
+    const noBtn = buttons[1];
+
+    const disableButtons = () => {
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+    };
+
+    const finishCurrent = (textLabel) => {
+      if (!chatConfirmArea) return;
+      chatConfirmArea.innerHTML = `<div class="chat-input-label" style="font-size:0.85rem; color:#d1d5db;">${textLabel}</div>`;
+      setTimeout(() => {
+        // Joriy elementni navbatdan olib tashlaymiz va keyingisini ko'rsatamiz
+        pendingConfirmQueue.shift();
+        showNextConfirm();
+      }, 1500);
+    };
+
+    yesBtn.addEventListener('click', () => {
+      disableButtons();
+      fetch('/api/exchange/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: currentTelegramId,
+          exchange_id: currentChatExchangeId,
+          decision: 'keldi',
+          account_index: accountIndex || null
+        })
+      })
+        .then((resp) => resp.json().catch(() => ({})))
+        .then((data) => {
+          if (!data || data.error) {
+            if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
+            yesBtn.disabled = false;
+            noBtn.disabled = false;
+            return;
+          }
+          finishCurrent('Siz bu startni "keldi" deb belgiladingiz.');
+
+          // Agar ikkala tomon ham "Keldi" bosib bo'lgan bo'lsa, backend completed=true qaytaradi
+          // va biz shu yerdan yakuniy muvaffaqiyat xabarini chiqaramiz
+          if (data.completed) {
+            appendPartnerChatMessage('[SYSTEM] EXCHANGE_SUCCESS');
+          }
+        })
+        .catch((e) => {
+          console.error('approve keldi xato:', e);
+          if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
+          yesBtn.disabled = false;
+          noBtn.disabled = false;
+        });
+    });
+
+    noBtn.addEventListener('click', () => {
+      disableButtons();
+      fetch('/api/exchange/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: currentTelegramId,
+          exchange_id: currentChatExchangeId,
+          decision: 'kelmadi',
+          account_index: accountIndex || null
+        })
+      })
+        .then((resp) => resp.json().catch(() => ({})))
+        .then((data) => {
+          if (!data || data.error) {
+            if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
+            yesBtn.disabled = false;
+            noBtn.disabled = false;
+            return;
+          }
+          finishCurrent('Siz bu startni "kelmadi" deb belgiladingiz.');
+        })
+        .catch((e) => {
+          console.error('approve kelmadi xato:', e);
+          if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
+          yesBtn.disabled = false;
+          noBtn.disabled = false;
+        });
+    });
+  }
 
   function getClosedChatStorageKey(telegramId, exchangeId) {
     return `closed_chat_${telegramId}_${exchangeId}`;
@@ -709,105 +831,11 @@
          <div style="margin-top:6px;"><img src="${url}" alt="Screenshot" style="max-width:100%; border-radius:8px;" /></div>`;
       exchangeChatMessages.appendChild(msg);
 
-      // Pinned-like savol: keldi / kelmadi – chat inputining tepasidagi maxsus zonada ko'rsatamiz
-      if (chatConfirmArea) {
-        const questionLabel = accountIndex
-          ? `${accountIndex}-akkauntdan kelgan start bormi?`
-          : 'Bu screenshot bo\'yicha start keldimi?';
-
-        chatConfirmArea.innerHTML =
-          `<div class="chat-input-label">${questionLabel}</div>
-           <div class="chat-input-row" style="margin-top:6px; display:flex; gap:8px;">
-             <button type="button" class="primary-btn" style="flex:1;">Keldi</button>
-             <button type="button" class="secondary-btn" style="flex:1;">Kelmadi</button>
-           </div>`;
-        chatConfirmArea.style.display = 'block';
-      }
-
-      const buttons = chatConfirmArea ? chatConfirmArea.querySelectorAll('button') : null;
-      if (buttons && buttons.length === 2 && currentTelegramId && currentChatExchangeId) {
-        const yesBtn = buttons[0];
-        const noBtn = buttons[1];
-
-        const disableButtons = () => {
-          yesBtn.disabled = true;
-          noBtn.disabled = true;
-        };
-
-        const hideConfirmArea = (textLabel) => {
-          if (!chatConfirmArea) return;
-          chatConfirmArea.innerHTML = `<div class="chat-input-label" style="font-size:0.85rem; color:#d1d5db;">${textLabel}</div>`;
-          setTimeout(() => {
-            chatConfirmArea.style.display = 'none';
-            chatConfirmArea.innerHTML = '';
-          }, 1500);
-        };
-
-        yesBtn.addEventListener('click', () => {
-          disableButtons();
-          fetch('/api/exchange/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: currentTelegramId,
-              exchange_id: currentChatExchangeId,
-              decision: 'keldi',
-              account_index: accountIndex || null
-            })
-          })
-            .then((resp) => resp.json().catch(() => ({})))
-            .then((data) => {
-              if (!data || data.error) {
-                if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
-                yesBtn.disabled = false;
-                noBtn.disabled = false;
-                return;
-              }
-              hideConfirmArea('Siz bu startni "keldi" deb belgiladingiz.');
-
-              // Agar ikkala tomon ham "Keldi" bosib bo'lgan bo'lsa, backend completed=true qaytaradi
-              // va biz shu yerdan yakuniy muvaffaqiyat xabarini chiqaramiz
-              if (data.completed) {
-                appendPartnerChatMessage('[SYSTEM] EXCHANGE_SUCCESS');
-              }
-            })
-            .catch((e) => {
-              console.error('approve keldi xato:', e);
-              if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
-              yesBtn.disabled = false;
-              noBtn.disabled = false;
-            });
-        });
-
-        noBtn.addEventListener('click', () => {
-          disableButtons();
-          fetch('/api/exchange/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: currentTelegramId,
-              exchange_id: currentChatExchangeId,
-              decision: 'kelmadi',
-              account_index: accountIndex || null
-            })
-          })
-            .then((resp) => resp.json().catch(() => ({})))
-            .then((data) => {
-              if (!data || data.error) {
-                if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
-                yesBtn.disabled = false;
-                noBtn.disabled = false;
-                return;
-              }
-              hideConfirmArea('Siz bu startni "kelmadi" deb belgiladingiz.');
-            })
-            .catch((e) => {
-              console.error('approve kelmadi xato:', e);
-              if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
-              yesBtn.disabled = false;
-              noBtn.disabled = false;
-            });
-        });
+      // Pinned-like savol: keldi / kelmadi – navbatga qo'shamiz (1-akkaunt, keyin 2-akkaunt va hokazo)
+      if (accountIndex) {
+        enqueueConfirm(accountIndex);
+      } else {
+        enqueueConfirm(null);
       }
     } else {
       msg.textContent = text;
