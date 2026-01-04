@@ -463,7 +463,8 @@
       const label = accountIndex ? `${accountIndex}-akkauntdan screenshot yubordingiz.` : 'Siz screenshot yubordingiz.';
       msg.innerHTML =
         `<div>${label}</div>
-         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>
+         <div style="margin-top:6px;"><img src="${url}" alt="Screenshot" style="max-width:100%; border-radius:8px;" /></div>`;
     } else {
       msg.textContent = trimmed;
     }
@@ -490,7 +491,8 @@
       const label = accountIndex ? `${accountIndex}-akkauntdan screenshot yubordi.` : 'Sherigingiz screenshot yubordi.';
       msg.innerHTML =
         `<div>${label}</div>
-         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>`;
+         <div style="margin-top:4px; word-break:break-all;"><a href="${url}" target="_blank" rel="noopener noreferrer">Rasmni ko'rish</a></div>
+         <div style="margin-top:6px;"><img src="${url}" alt="Screenshot" style="max-width:100%; border-radius:8px;" /></div>`;
       exchangeChatMessages.appendChild(msg);
 
       // Pinned-like savol: keldi / kelmadi
