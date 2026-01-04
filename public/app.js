@@ -451,6 +451,11 @@
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    // O'zimiz yuborgan system xabarlar chatda xom ko'rinmasin
+    if (trimmed.startsWith('[SYSTEM')) {
+      return;
+    }
+
     const isScreenshot = trimmed.startsWith('[SCREENSHOT');
 
     const msg = document.createElement('div');
@@ -702,6 +707,12 @@
                 return;
               }
               markAnswered('Siz bu startni "keldi" deb belgiladingiz.');
+
+              // Agar ikkala tomon ham "Keldi" bosib bo'lgan bo'lsa, backend completed=true qaytaradi
+              // va biz shu yerdan yakuniy muvaffaqiyat xabarini chiqaramiz
+              if (data.completed) {
+                appendPartnerChatMessage('[SYSTEM] EXCHANGE_SUCCESS');
+              }
             })
             .catch((e) => {
               console.error('approve keldi xato:', e);
