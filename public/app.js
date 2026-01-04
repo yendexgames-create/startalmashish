@@ -538,9 +538,21 @@
       return;
     }
 
-    if (text === '[SYSTEM] APPROVED') {
+    if (text.startsWith('[SYSTEM] APPROVED')) {
       msg.className = 'chat-message chat-message-system';
-      msg.textContent = 'Sherigingiz bosgan startingizni qabul qildi.';
+
+      let accountIndex = null;
+      const m = text.match(/^\[SYSTEM\]\s+APPROVED\s+(\d+)/);
+      if (m && m[1]) {
+        accountIndex = parseInt(m[1], 10);
+      }
+
+      if (accountIndex) {
+        msg.textContent = `Sherigingiz ${accountIndex}-akkauntdagi startingizni qabul qildi.`;
+      } else {
+        msg.textContent = 'Sherigingiz bosgan startingizni qabul qildi.';
+      }
+
       exchangeChatMessages.appendChild(msg);
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
@@ -557,14 +569,37 @@
         accountIndex = parseInt(m[1], 10);
       }
 
+      let label;
       if (accountIndex) {
         // Shu account uchun qayta screenshot yuborish imkonini beramiz
         currentScreenshotAccountIndex = accountIndex;
-        msg.textContent = `${accountIndex}-akkauntdagi startingiz qabul qilinmadi, qayta urinib ko'ring.`;
+        label = `${accountIndex}-akkauntdagi startingiz qabul qilinmadi, qayta urinib ko'ring.`;
       } else {
-        msg.textContent = 'Sizni start qabul qilinmadi, qayta urinib ko\'ring.';
+        label = 'Sizni start qabul qilinmadi, qayta urinib ko\'ring.';
       }
+
+      // Matn + qayta yuklash tugmasi
+      let btnHtml = '';
+      if (accountIndex && chatScreenshotInput) {
+        btnHtml =
+          '<div style="margin-top:6px;">' +
+          '<button type="button" class="secondary-btn" id="retry-screenshot-btn" style="width:100%;">Screenshotni qayta yuborish</button>' +
+          '</div>';
+      }
+
+      msg.innerHTML = `<div>${label}</div>${btnHtml}`;
       exchangeChatMessages.appendChild(msg);
+
+      if (accountIndex && chatScreenshotInput) {
+        const retryBtn = msg.querySelector('#retry-screenshot-btn');
+        if (retryBtn) {
+          retryBtn.addEventListener('click', () => {
+            currentScreenshotAccountIndex = accountIndex;
+            chatScreenshotInput.click();
+          });
+        }
+      }
+
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
       }
