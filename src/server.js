@@ -238,6 +238,111 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// Keldi / Kelmadi tasdiqlash
+app.post('/api/exchange/approve', async (req, res) => {
+  try {
+    const { telegram_id, exchange_id, decision } = req.body || {};
+
+    const userId = parseInt(telegram_id, 10);
+    const exId = parseInt(exchange_id, 10);
+    const dec = typeof decision === 'string' ? decision.trim().toLowerCase() : '';
+
+    if (!userId || !exId || !dec) {
+      return res.status(400).json({ error: 'telegram_id, exchange_id va decision body da kerak' });
+    }
+
+    if (dec !== 'keldi' && dec !== 'kelmadi') {
+      return res.status(400).json({ error: 'decision faqat keldi yoki kelmadi bo\'lishi mumkin' });
+    }
+
+    const ex = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    if (!ex) {
+      return res.status(404).json({ error: 'Almashish topilmadi' });
+    }
+
+    if (ex.user1_id !== userId && ex.user2_id !== userId) {
+      return res.status(403).json({ error: 'Bu almashishga siz bog\'liq emassiz' });
+    }
+
+    const now = Date.now();
+    const isUser1 = ex.user1_id === userId;
+    const myField = isUser1 ? 'user1_approved' : 'user2_approved';
+
+    let systemText;
+    if (dec === 'keldi') {
+      // Foydalanuvchi sherik startini qabul qildi
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE exchanges SET ${myField} = 1 WHERE id = ?`,
+          [exId],
+          (err) => {
+            if (err) return reject(err);
+            resolve();
+          }
+        );
+      });
+      systemText = '[SYSTEM] APPROVED';
+    } else {
+      // Foydalanuvchi sherik startini rad etdi
+      systemText = '[SYSTEM] REJECTED';
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
+        [exId, userId, systemText, now],
+        (err) => {
+          if (err) return reject(err);
+          resolve();
+        }
+      );
+    });
+
+    // Yangilangan almashuvni o'qib, ikkala tomon ham tasdiqlaganmi tekshiramiz
+    const updated = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM exchanges WHERE id = ?', [exId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+
+    let completed = false;
+    if (updated && updated.user1_approved && updated.user2_approved) {
+      await new Promise((resolve, reject) => {
+        db.run('UPDATE exchanges SET status = ? WHERE id = ?', ['completed', exId], (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      // Muvaffaqiyatli yakunlanganini ko'rsatish uchun umumiy system xabar
+      await new Promise((resolve, reject) => {
+        db.run(
+          'INSERT INTO exchange_messages (exchange_id, from_telegram_id, text, created_at) VALUES (?, ?, ?, ?)',
+          [exId, 0, '[SYSTEM] EXCHANGE_SUCCESS', now],
+          (err) => {
+            if (err) return reject(err);
+            resolve();
+          }
+        );
+      });
+
+      completed = true;
+    }
+
+    return res.json({ ok: true, completed });
+  } catch (e) {
+    console.error('/api/exchange/approve xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // WebApp'dan screenshot yuklash (Cloudinary orqali)
 app.post('/api/exchange/screenshot', upload.single('file'), async (req, res) => {
   try {

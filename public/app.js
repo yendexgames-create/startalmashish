@@ -532,6 +532,117 @@
       return;
     }
 
+    if (text === '[SYSTEM] APPROVED') {
+      msg.className = 'chat-message chat-message-system';
+      msg.textContent = 'Sherigingiz bosgan startingizni qabul qildi.';
+      exchangeChatMessages.appendChild(msg);
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+      return;
+    }
+
+    if (text === '[SYSTEM] REJECTED') {
+      msg.className = 'chat-message chat-message-system';
+      msg.textContent = 'Sizni start qabul qilinmadi, qayta urinib ko\'ring.';
+      exchangeChatMessages.appendChild(msg);
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+      return;
+    }
+
+    if (text === '[SYSTEM] EXCHANGE_SUCCESS') {
+      msg.className = 'chat-message chat-message-system';
+      msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi. Chat yopildi.';
+      exchangeChatMessages.appendChild(msg);
+
+      // Muvaffaqiyatli almashuv – chatni tozalaymiz
+      if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+        chatPollInterval = null;
+      }
+      if (chatTimerInterval) {
+        clearInterval(chatTimerInterval);
+        chatTimerInterval = null;
+      }
+      if (chatAccountsPollInterval) {
+        clearInterval(chatAccountsPollInterval);
+        chatAccountsPollInterval = null;
+      }
+
+      if (currentTelegramId && currentChatExchangeId) {
+        markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
+      }
+
+      if (exchangeChatCard) exchangeChatCard.style.display = 'none';
+      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+      if (exchangeCard) exchangeCard.style.display = 'none';
+
+      if (currentTelegramId) {
+        Promise.all([
+          loadExchangeOffers(currentTelegramId),
+          loadSentExchanges(currentTelegramId)
+        ]).catch((e) => console.error('EXCHANGE_SUCCESS dan keyin takliflarni yangilash xato:', e));
+      }
+
+      currentChatExchangeId = null;
+
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+
+      return;
+    }
+
+    // System xabarlar uchun maxsus ishlov
+    if (text === '[SYSTEM] CHAT_CLOSED') {
+      msg.className = 'chat-message chat-message-system';
+      msg.textContent = 'Sherigingiz chatni tark etdi. Chat yopildi.';
+      exchangeChatMessages.appendChild(msg);
+
+      // Sherik chatni yopgan – frontdagi chatni ham tozalaymiz
+      if (chatPollInterval) {
+        clearInterval(chatPollInterval);
+        chatPollInterval = null;
+      }
+      if (chatTimerInterval) {
+        clearInterval(chatTimerInterval);
+        chatTimerInterval = null;
+      }
+      if (chatAccountsPollInterval) {
+        clearInterval(chatAccountsPollInterval);
+        chatAccountsPollInterval = null;
+      }
+
+      // Bu almashuvni qo'lda yopilgan deb belgilaymiz, shunda qayta auto-open bo'lmaydi
+      if (currentTelegramId && currentChatExchangeId) {
+        markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
+      }
+
+      // Chat kartasini yopib, asosiy almashish ko'rinishini qayta ko'rsatamiz
+      if (exchangeChatCard) exchangeChatCard.style.display = 'none';
+      if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+      if (exchangeCard) exchangeCard.style.display = 'none';
+
+      // Takliflar ro'yxatini yangilab olamiz
+      if (currentTelegramId) {
+        Promise.all([
+          loadExchangeOffers(currentTelegramId),
+          loadSentExchanges(currentTelegramId)
+        ]).catch((e) => console.error('Sherik chatni yopganda takliflarni yangilash xato:', e));
+      }
+
+      // Faol chat yo'q deb belgilaymiz
+      currentChatExchangeId = null;
+
+      if (exchangeChatMessages.scrollHeight) {
+        exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
+      }
+
+      return;
+    }
+
     if (isScreenshot) {
       const match = text.match(/^\[SCREENSHOT(?:\s+(\d+))?\]\s+(.+)$/);
       const accountIndex = match && match[1] ? parseInt(match[1], 10) : null;
@@ -558,14 +669,75 @@
       exchangeChatMessages.appendChild(qa);
 
       const buttons = qa.querySelectorAll('button');
-      if (buttons && buttons.length === 2) {
+      if (buttons && buttons.length === 2 && currentTelegramId && currentChatExchangeId) {
         const yesBtn = buttons[0];
         const noBtn = buttons[1];
+
+        const disableButtons = () => {
+          yesBtn.disabled = true;
+          noBtn.disabled = true;
+        };
+
+        const markAnswered = (textLabel) => {
+          qa.innerHTML = `<div>${questionLabel}</div><div style="margin-top:6px; font-size:0.85rem; color:#d1d5db;">${textLabel}</div>`;
+        };
+
         yesBtn.addEventListener('click', () => {
-          if (tg) tg.showAlert('"Keldi" tugmasi bosildi. (Keyin backendga bog\'laymiz)');
+          disableButtons();
+          fetch('/api/exchange/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              exchange_id: currentChatExchangeId,
+              decision: 'keldi'
+            })
+          })
+            .then((resp) => resp.json().catch(() => ({})))
+            .then((data) => {
+              if (!data || data.error) {
+                if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
+                yesBtn.disabled = false;
+                noBtn.disabled = false;
+                return;
+              }
+              markAnswered('Siz bu startni "keldi" deb belgiladingiz.');
+            })
+            .catch((e) => {
+              console.error('approve keldi xato:', e);
+              if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
+              yesBtn.disabled = false;
+              noBtn.disabled = false;
+            });
         });
+
         noBtn.addEventListener('click', () => {
-          if (tg) tg.showAlert('"Kelmadi" tugmasi bosildi. (Keyin backendga bog\'laymiz)');
+          disableButtons();
+          fetch('/api/exchange/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: currentTelegramId,
+              exchange_id: currentChatExchangeId,
+              decision: 'kelmadi'
+            })
+          })
+            .then((resp) => resp.json().catch(() => ({})))
+            .then((data) => {
+              if (!data || data.error) {
+                if (tg) tg.showAlert(data && data.error ? data.error : 'Tasdiqlashda xatolik yuz berdi');
+                yesBtn.disabled = false;
+                noBtn.disabled = false;
+                return;
+              }
+              markAnswered('Siz bu startni "kelmadi" deb belgiladingiz.');
+            })
+            .catch((e) => {
+              console.error('approve kelmadi xato:', e);
+              if (tg) tg.showAlert('Tasdiqlashda xatolik yuz berdi');
+              yesBtn.disabled = false;
+              noBtn.disabled = false;
+            });
         });
       }
     } else {
