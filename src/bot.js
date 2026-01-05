@@ -494,12 +494,9 @@ bot.on('contact', async (ctx) => {
     }
   }
   await ctx.reply(
-    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi start almashish uchun ishlatiladigan bot/link manzilini yuboring.\nMasalan: https://t.me/yourbot?start=...',
-    Markup.removeKeyboard()
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi "🧩 Web ilova" tugmasi orqali Web ilovani ochib, profil va slotlaringiz uchun linklarni to‘ldirishingiz mumkin.',
+    mainMenuKeyboard()
   );
-
-  // Keyingi bosqichda linkni qabul qilish uchun holat
-  setState(telegramId, 'WAIT_LINK');
 
   // Agar referal orqali kelgan bo'lsa, taklif qilgan odamga xabar yuboramiz
   if (referrerId) {
