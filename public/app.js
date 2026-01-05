@@ -347,6 +347,65 @@
   const chatScreenshotInput = document.getElementById('chat-screenshot-input');
   const chatScreenshotButton = document.getElementById('chat-screenshot-button');
   const exchangeStatus = document.getElementById('exchange-status');
+  const exchangeSuccessModal = document.getElementById('exchange-success-modal');
+  const exchangeSuccessClose = document.getElementById('exchange-success-close');
+  const exchangeSuccessOk = document.getElementById('exchange-success-ok');
+
+  function closeExchangeChatCompletely() {
+    if (chatPollInterval) {
+      clearInterval(chatPollInterval);
+      chatPollInterval = null;
+    }
+    if (chatTimerInterval) {
+      clearInterval(chatTimerInterval);
+      chatTimerInterval = null;
+    }
+    if (chatAccountsPollInterval) {
+      clearInterval(chatAccountsPollInterval);
+      chatAccountsPollInterval = null;
+    }
+
+    if (currentTelegramId && currentChatExchangeId) {
+      markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
+    }
+
+    if (exchangeChatCard) exchangeChatCard.style.display = 'none';
+    if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
+    if (exchangeCard) exchangeCard.style.display = 'none';
+
+    if (currentTelegramId) {
+      Promise.all([
+        loadExchangeOffers(currentTelegramId),
+        loadExchangeHistory(currentTelegramId),
+        loadSentExchanges(currentTelegramId)
+      ]).catch((e) => console.error('EXCHANGE_SUCCESS dan keyin takliflarni yangilash xato:', e));
+    }
+
+    currentChatExchangeId = null;
+  }
+
+  function showExchangeSuccessModal() {
+    if (!exchangeSuccessModal) {
+      // Modal bo'lmasa, eski xatti-harakatga qaytamiz
+      closeExchangeChatCompletely();
+      return;
+    }
+    exchangeSuccessModal.style.display = 'flex';
+  }
+
+  if (exchangeSuccessClose && exchangeSuccessModal) {
+    exchangeSuccessClose.addEventListener('click', () => {
+      exchangeSuccessModal.style.display = 'none';
+      closeExchangeChatCompletely();
+    });
+  }
+
+  if (exchangeSuccessOk && exchangeSuccessModal) {
+    exchangeSuccessOk.addEventListener('click', () => {
+      exchangeSuccessModal.style.display = 'none';
+      closeExchangeChatCompletely();
+    });
+  }
 
   // Tutorial elementlari
   const tutorialOverlay = document.getElementById('tutorial-overlay');
@@ -807,45 +866,14 @@
 
     if (text === '[SYSTEM] EXCHANGE_SUCCESS') {
       msg.className = 'chat-message chat-message-system';
-      msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi. Chat yopildi.';
+      msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi.';
       exchangeChatMessages.appendChild(msg);
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
       }
 
-      // Muvaffaqiyat xabarini foydalanuvchi ko'ra olishi uchun kichik pauza bilan yopamiz
-      setTimeout(() => {
-        if (chatPollInterval) {
-          clearInterval(chatPollInterval);
-          chatPollInterval = null;
-        }
-        if (chatTimerInterval) {
-          clearInterval(chatTimerInterval);
-          chatTimerInterval = null;
-        }
-        if (chatAccountsPollInterval) {
-          clearInterval(chatAccountsPollInterval);
-          chatAccountsPollInterval = null;
-        }
-
-        if (currentTelegramId && currentChatExchangeId) {
-          markChatManuallyClosed(currentTelegramId, currentChatExchangeId);
-        }
-
-        if (exchangeChatCard) exchangeChatCard.style.display = 'none';
-        if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
-        if (exchangeCard) exchangeCard.style.display = 'none';
-
-        if (currentTelegramId) {
-          Promise.all([
-            loadExchangeOffers(currentTelegramId),
-            loadSentExchanges(currentTelegramId)
-          ]).catch((e) => console.error('EXCHANGE_SUCCESS dan keyin takliflarni yangilash xato:', e));
-        }
-
-        currentChatExchangeId = null;
-      }, 2500);
-
+      // Endi modal orqali yakunlaymiz
+      showExchangeSuccessModal();
       return;
     }
 
