@@ -384,34 +384,7 @@
     currentChatExchangeId = null;
   }
 
-  function showExchangeSuccessModal() {
-    if (!exchangeSuccessModal) {
-      return;
-    }
-    exchangeSuccessModal.style.display = 'flex';
-  }
-
-  function finishExchangeWithModal() {
-    // Avval chatni tartibli yopamiz, so'ngra umumiy modalni ko'rsatamiz
-    closeExchangeChatCompletely();
-    if (exchangeSuccessModal) {
-      exchangeSuccessModal.style.display = 'flex';
-    }
-  }
-
-  if (exchangeSuccessClose && exchangeSuccessModal) {
-    exchangeSuccessClose.addEventListener('click', () => {
-      exchangeSuccessModal.style.display = 'none';
-      closeExchangeChatCompletely();
-    });
-  }
-
-  if (exchangeSuccessOk && exchangeSuccessModal) {
-    exchangeSuccessOk.addEventListener('click', () => {
-      exchangeSuccessModal.style.display = 'none';
-      closeExchangeChatCompletely();
-    });
-  }
+  // Hozircha modal ishlatilmayapti, lekin kelajak uchun saqlab qo'yilgan
 
   // Tutorial elementlari
   const tutorialOverlay = document.getElementById('tutorial-overlay');
@@ -872,14 +845,13 @@
 
     if (text === '[SYSTEM] EXCHANGE_SUCCESS') {
       msg.className = 'chat-message chat-message-system';
-      msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi.';
+      msg.textContent = 'Almashish muvaffaqiyatli amalga oshirildi. Endi chatni "Chatni yopish" tugmasi bilan yopib chiqishingiz mumkin.';
       exchangeChatMessages.appendChild(msg);
       if (exchangeChatMessages.scrollHeight) {
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
       }
 
-      // Avval chat yopiladi, keyin modal ko'rsatiladi
-      finishExchangeWithModal();
+      // Chatni avtomatik yopmaymiz, foydalanuvchi o'zi tugma bilan yopadi
       return;
     }
 
