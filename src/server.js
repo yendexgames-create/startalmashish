@@ -215,6 +215,9 @@ app.get('/api/me', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
+    // Foydalanuvchining asosiy linkidan bot nomini ajratib olamiz (masalan, yourbot)
+    const myBotName = extractBotNameFromLink(user.main_link);
+
     const invited = user.invited_friends_count || 0;
     const effectiveSlots = invited >= 1 ? 3 : 1;
 
@@ -1239,6 +1242,9 @@ app.get('/api/exchange/offers', async (req, res) => {
       return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
     }
 
+    // Joriy foydalanuvchining asosiy linkidan bot nomini ajratib olamiz (masalan yourbot)
+    const myBotName = extractBotNameFromLink(user.main_link);
+
     // exchanges jadvalidan statusi pending_partner bo'lgan, siz user2 bo'lganlar
     const offers = await new Promise((resolve, reject) => {
       db.all(
@@ -1261,6 +1267,12 @@ app.get('/api/exchange/offers', async (req, res) => {
     // Har bir taklif uchun user1 ning slot linklarini ham qo'shamiz
     const detailedOffers = await Promise.all(
       offers.map(async (offer) => {
+        // Agar ikkala tarafning asosiy linki bir xil botga tegishli bo'lsa (masalan yourbot), bu taklifni tashlab ketamiz
+        const otherBotName = extractBotNameFromLink(offer.user1_main_link);
+        if (myBotName && otherBotName && myBotName === otherBotName) {
+          return null;
+        }
+
         let slots = [];
         try {
           const links = await getUserLinks(offer.user1_id);
@@ -1289,7 +1301,10 @@ app.get('/api/exchange/offers', async (req, res) => {
       })
     );
 
-    return res.json({ offers: detailedOffers });
+    // null qaytganlarini (bir xil botli takliflarni) filtrlab tashlaymiz
+    const filtered = detailedOffers.filter((o) => o !== null);
+
+    return res.json({ offers: filtered });
   } catch (e) {
     console.error('/api/exchange/offers xato:', e);
     return res.status(500).json({ error: 'Server xatosi' });
