@@ -395,6 +395,79 @@ bot.start(async (ctx) => {
     // referrerId bo'lsa, keyingi bosqichda saqlash uchun state'ga qo'yamiz
     setState(telegramId, 'WAIT_PHONE', { referrerId });
   } else {
+    // Agar foydalanuvchi allaqachon ro'yxatdan o'tgan bo'lsa ham, agar u hali hech kimning referali bo'lmagan
+    // va /start orqali ref_... bilan kirgan bo'lsa, referalni qayd etamiz
+    if (referrerId && !existing.referrer_id && referrerId !== telegramId) {
+      const now = Date.now();
+
+      db.serialize(() => {
+        db.run(
+          'INSERT INTO referrals (referrer_id, new_user_id, created_at) VALUES (?, ?, ?)',
+          [referrerId, telegramId, now],
+          (err) => {
+            if (err) {
+              console.error('Referral (existing user) yozishda xato:', err);
+            }
+          }
+        );
+
+        db.run(
+          `UPDATE users
+           SET invited_friends_count = invited_friends_count + 1,
+               slots = 3,
+               referrer_id = COALESCE(referrer_id, ?)
+           WHERE telegram_id = ?`,
+          [referrerId, telegramId],
+          (err) => {
+            if (err) {
+              console.error('invited_friends_count/slots (existing user) yangilashda xato:', err);
+            }
+          }
+        );
+
+        db.run(
+          'INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?) ON CONFLICT(user_id, friend_id) DO NOTHING',
+          [referrerId, telegramId, now],
+          (err) => {
+            if (err) {
+              console.error("friendships (referrer->existing) qo'shishda xato:", err);
+            }
+          }
+        );
+
+        db.run(
+          'INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?) ON CONFLICT(user_id, friend_id) DO NOTHING',
+          [telegramId, referrerId, now],
+          (err) => {
+            if (err) {
+              console.error("friendships (existing->referrer) qo'shishda xato:", err);
+            }
+          }
+        );
+      });
+
+      // Refererni xabardor qilamiz
+      const invitedName = `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim() || '-';
+      const invitedUsername = ctx.from.username ? '@' + ctx.from.username : '-';
+
+      const inviterText =
+        '🎉 Sizning referal linkingiz orqali foydalanuvchi botga qayta kirib, akkauntini bog‘ladi.\n' +
+        `Ism: ${invitedName}\n` +
+        `Username: ${invitedUsername}\n\n` +
+        'Bu taklif uchun sizga qo‘shimcha slotlar ochiladi. Har bir taklif qilingan do‘st uchun bitta slot qo‘shilib boradi (jami 3 tagacha).\n\n' +
+        'Web ilovada slotlar bo‘limiga o‘tib, yangi slot(lar) uchun link qo‘shishingiz mumkin.';
+
+      try {
+        await ctx.telegram.sendMessage(
+          referrerId,
+          inviterText,
+          Markup.inlineKeyboard([[Markup.button.webApp("🔗 Slotlarni to‘ldirish", WEBAPP_URL)]])
+        );
+      } catch (e) {
+        // agar xabar yuborishda xato bo'lsa, bot ishini to'xtatmaymiz
+      }
+    }
+
     await ctx.reply(
       'Siz ro‘yxatdan o‘tgansiz. Pastdagi tugmalar orqali almashishni boshlashingiz yoki Web ilovani ochishingiz mumkin.',
       mainMenuKeyboard()
