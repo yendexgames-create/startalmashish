@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
-import { db, upsertUserLink, getUserLinks } from './db.js';
+import { db, upsertUserLink, getUserLinks, getChannels, recordChannelJoin } from './db.js';
 import { bot } from './bot.js';
 
 // Botlarni ishga tushiramiz (side-effect imports)
@@ -39,6 +39,99 @@ app.get('/', (req, res) => {
 
 app.get('/webapp', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
+});
+
+// WebApp ochilganda kanalga obuna bo'lgan-bo'lmaganini tekshirish uchun endpoint
+app.get('/api/check_channel', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    let channels = [];
+    try {
+      channels = await getChannels();
+    } catch (e) {
+      console.error('getChannels xato:', e);
+    }
+
+    // Agar konfiguratsiyada kanal bo'lmasa, WebApp'ni cheklamaymiz
+    if (!channels || channels.length === 0) {
+      return res.json({ ok: true });
+    }
+
+    const notSubscribed = [];
+
+    for (const ch of channels) {
+      const chatId = ch.name || ch.link;
+      if (!chatId) continue;
+
+      try {
+        const member = await bot.telegram.getChatMember(chatId, telegramId);
+        const status = member && member.status;
+        if (!['member', 'administrator', 'creator'].includes(status)) {
+          notSubscribed.push(ch);
+        }
+      } catch (e) {
+        console.error('Kanalga obuna tekshiruvda xatolik (WebApp check_channel):', chatId, e.description || e.message || e);
+        // Agar chat topilmasa (Bad Request: chat not found), bu kanalni talab qilmaymiz
+        if (e && e.response && e.response.error_code === 400) {
+          continue;
+        }
+        notSubscribed.push(ch);
+      }
+    }
+
+    if (notSubscribed.length === 0) {
+      // Birinchi muvaffaqiyatli o'tishda joined_count ni oshirishga harakat qilamiz
+      try {
+        for (const ch of channels) {
+          await recordChannelJoin(ch.id, telegramId);
+        }
+      } catch (e) {
+        console.error('recordChannelJoin (WebApp) xatosi:', e);
+      }
+
+      return res.json({ ok: true });
+    }
+
+    // Obuna bo'lmagan foydalanuvchiga bot orqali kanal(lar)ga o'tish xabarini yuboramiz
+    try {
+      const rows = [];
+      notSubscribed.forEach((ch, idx) => {
+        const name = ch.name || `Kanal ${idx + 1}`;
+        const link = ch.link || (ch.name ? `https://t.me/${ch.name.replace('@', '')}` : null);
+        if (!link) return;
+        rows.push([{ text: name, url: link }]);
+      });
+
+      if (rows.length) {
+        // Oxirida "Tekshirish" tugmasi
+        rows.push([
+          { text: '✅ Tekshirish', callback_data: 'check_sub' }
+        ]);
+
+        await bot.telegram.sendMessage(
+          telegramId,
+          'Web ilovadan foydalanish uchun quyidagi kanallarga obuna bo‘ling, so‘ng "✅ Tekshirish" tugmasini bosing.',
+          {
+            reply_markup: {
+              inline_keyboard: rows
+            }
+          }
+        );
+      }
+    } catch (e) {
+      console.error('check_channel xabar yuborishda xato:', e);
+    }
+
+    // WebApp uchun: obuna talab qilinadi
+    return res.json({ ok: false });
+  } catch (e) {
+    console.error('/api/check_channel xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
 });
 
 // --- DB helperlar (bot.js dagi bilan bir xil mantiq) ---

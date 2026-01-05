@@ -7,6 +7,27 @@
     tg.ready();
   }
 
+  async function checkChannelSubscription(telegramId) {
+    try {
+      const resp = await fetch(`/api/check_channel?telegram_id=${encodeURIComponent(telegramId)}`);
+      if (!resp.ok) return true; // Agar endpoint ishlamasa, foydalanuvchini to‘smaslikka harakat qilamiz
+
+      const data = await resp.json().catch(() => ({}));
+      if (data && data.ok === false) {
+        // Obuna talab qilinmoqda: WebApp'ni yopamiz
+        if (tg && typeof tg.close === 'function') {
+          tg.close();
+        }
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      console.error('checkChannelSubscription xato:', e);
+      return true;
+    }
+  }
+
   async function startExchangePolling() {
     if (exchangePollInterval) return;
     if (!tg) return;
@@ -1494,6 +1515,12 @@
     const u = tg.initDataUnsafe.user;
     const telegramId = u.id;
     currentTelegramId = telegramId;
+
+    // Avval kanal obunasini tekshiramiz. Obuna bo'lmasa, WebApp yopiladi va davom etmaymiz.
+    const allowed = await checkChannelSubscription(telegramId);
+    if (!allowed) {
+      return;
+    }
 
     try {
       const [meRes, slotsRes, friendsRes, activeChatRes, offersRes, sentRes, historyRes] = await Promise.all([
