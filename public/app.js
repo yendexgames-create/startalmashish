@@ -386,11 +386,17 @@
 
   function showExchangeSuccessModal() {
     if (!exchangeSuccessModal) {
-      // Modal bo'lmasa, eski xatti-harakatga qaytamiz
-      closeExchangeChatCompletely();
       return;
     }
     exchangeSuccessModal.style.display = 'flex';
+  }
+
+  function finishExchangeWithModal() {
+    // Avval chatni tartibli yopamiz, so'ngra umumiy modalni ko'rsatamiz
+    closeExchangeChatCompletely();
+    if (exchangeSuccessModal) {
+      exchangeSuccessModal.style.display = 'flex';
+    }
   }
 
   if (exchangeSuccessClose && exchangeSuccessModal) {
@@ -872,8 +878,8 @@
         exchangeChatMessages.scrollTop = exchangeChatMessages.scrollHeight;
       }
 
-      // Endi modal orqali yakunlaymiz
-      showExchangeSuccessModal();
+      // Avval chat yopiladi, keyin modal ko'rsatiladi
+      finishExchangeWithModal();
       return;
     }
 
