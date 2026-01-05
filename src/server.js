@@ -134,6 +134,51 @@ app.get('/api/check_channel', async (req, res) => {
   }
 });
 
+// Referal orqali taklif qilingan do'stlar ro'yxati
+app.get('/api/referrals', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query param kerak' });
+    }
+
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+
+    // referrals jadvalida referrer_id = telegramId bo'lgan yozuvlar va ularning foydalanuvchi ma'lumotlari
+    const rows = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT r.new_user_id, r.created_at,
+                u.name, u.username, u.profile_link
+         FROM referrals r
+         JOIN users u ON r.new_user_id = u.telegram_id
+         WHERE r.referrer_id = ?
+         ORDER BY r.created_at DESC`,
+        [telegramId],
+        (err, r) => {
+          if (err) return reject(err);
+          resolve(r || []);
+        }
+      );
+    });
+
+    const items = rows.map((row) => ({
+      telegram_id: row.new_user_id,
+      name: row.name || null,
+      username: row.username || null,
+      profile_link: row.profile_link || null,
+      invited_at: row.created_at || null
+    }));
+
+    return res.json({ referrals: items });
+  } catch (e) {
+    console.error('/api/referrals xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // --- DB helperlar (bot.js dagi bilan bir xil mantiq) ---
 function findUserByTelegramId(telegramId) {
   return new Promise((resolve, reject) => {

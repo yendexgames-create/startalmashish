@@ -7,6 +7,69 @@
     tg.ready();
   }
 
+  async function loadReferrals(telegramId) {
+    if (!referralsCard || !referralsList || !referralsEmpty) return;
+
+    referralsCard.style.display = 'none';
+    referralsList.innerHTML = '';
+    referralsEmpty.style.display = 'none';
+
+    try {
+      const resp = await fetch(`/api/referrals?telegram_id=${encodeURIComponent(telegramId)}`);
+      if (!resp.ok) {
+        return;
+      }
+
+      const data = await resp.json().catch(() => ({}));
+      const items = data && Array.isArray(data.referrals) ? data.referrals : [];
+
+      if (!items.length) {
+        referralsCard.style.display = 'none';
+        referralsEmpty.style.display = 'none';
+        referralsList.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      items.forEach((item) => {
+        const name = item.name || 'Foydalanuvchi';
+        const username = item.username ? `@${item.username}` : '';
+        const initial = name.trim() ? name.trim().charAt(0).toUpperCase() : 'F';
+
+        let timeText = '';
+        if (item.invited_at) {
+          const d = new Date(item.invited_at);
+          if (!Number.isNaN(d.getTime())) {
+            const day = `${d.getDate()}`.padStart(2, '0');
+            const month = `${d.getMonth() + 1}`.padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = `${d.getHours()}`.padStart(2, '0');
+            const mins = `${d.getMinutes()}`.padStart(2, '0');
+            timeText = `${day}.${month}.${year} ${hours}:${mins}`;
+          }
+        }
+
+        html += `
+          <div class="referral-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(55,65,81,0.5);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:32px; height:32px; border-radius:999px; background:#111827; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.9rem;">${initial}</div>
+              <div>
+                <div style="font-size:0.9rem; font-weight:500;">${name}</div>
+                ${username ? `<div style="font-size:0.8rem; opacity:0.8;">${username}</div>` : ''}
+              </div>
+            </div>
+            <div style="font-size:0.8rem; opacity:0.8; text-align:right; min-width:90px;">${timeText}</div>
+          </div>`;
+      });
+
+      referralsList.innerHTML = html;
+      referralsEmpty.style.display = 'none';
+      referralsCard.style.display = 'block';
+    } catch (e) {
+      console.error('Referrals yuklashda xato:', e);
+    }
+  }
+
   async function checkChannelSubscription(telegramId) {
     try {
       const resp = await fetch(`/api/check_channel?telegram_id=${encodeURIComponent(telegramId)}`);
@@ -321,6 +384,10 @@
   const friendsDiv = document.getElementById('friends-content');
   const quickStatsDiv = document.getElementById('quick-stats-content');
 
+  const referralsCard = document.getElementById('referrals-card');
+  const referralsList = document.getElementById('referrals-list');
+  const referralsEmpty = document.getElementById('referrals-empty');
+
   const navbar = document.querySelector('.bottom-nav');
 
   // Bosh sahifadagi tugmalar va nav elementlari
@@ -405,6 +472,12 @@
     if (exchangeChatCard) exchangeChatCard.style.display = 'none';
     if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
     if (exchangeCard) exchangeCard.style.display = 'none';
+
+    // Chat yopilganda pastki navbarni qayta ko'rsatamiz
+    const navbar = document.querySelector('.bottom-nav');
+    if (navbar) {
+      navbar.style.display = 'flex';
+    }
 
     if (currentTelegramId) {
       Promise.all([
@@ -646,6 +719,12 @@
     currentChatExchangeId = exchangeId;
     hideExchangeCards();
 
+    // Chat faol bo'lganda pastki navbarni yashiramiz, faqat chat oynasi to'liq ko'rinsin
+    const navbar = document.querySelector('.bottom-nav');
+    if (navbar) {
+      navbar.style.display = 'none';
+    }
+
     // Har bir yangi chat ochilganda akkaunt soni formasi va keldi/kelmadi pinned zonani toza qilamiz
     if (chatAccountsArea) {
       chatAccountsArea.style.display = 'block';
@@ -789,6 +868,12 @@
       if (exchangeChatCard) exchangeChatCard.style.display = 'none';
       if (exchangeHeroCard) exchangeHeroCard.style.display = 'block';
       if (exchangeCard) exchangeCard.style.display = 'none';
+
+      // Chat sherik tomonidan yopilganda ham pastki navbarni qayta ko'rsatamiz
+      const navbar = document.querySelector('.bottom-nav');
+      if (navbar) {
+        navbar.style.display = 'flex';
+      }
 
       // Takliflar ro'yxatini yangilab olamiz
       if (currentTelegramId) {
@@ -1590,6 +1675,9 @@
       renderProfile(meData.user, u, { activeSlots, totalSlots });
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
+
+      // Taklif qilingan do'stlar (referal) ro'yxatini ham yuklaymiz
+      await loadReferrals(telegramId);
 
       // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
       const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
