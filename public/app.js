@@ -16,6 +16,7 @@
       try {
         await Promise.all([
           loadExchangeOffers(currentTelegramId),
+          loadExchangeHistory(currentTelegramId),
           loadSentExchanges(currentTelegramId)
         ]);
       } catch (e) {
@@ -226,6 +227,62 @@
     }
   }
 
+  async function loadExchangeHistory(telegramId) {
+    if (!exchangeHistoryCard || !exchangeHistoryList) return;
+    try {
+      const resp = await fetch(`/api/exchange/history?telegram_id=${encodeURIComponent(telegramId)}`);
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data || !data.ok || !Array.isArray(data.items)) {
+        exchangeHistoryCard.style.display = 'none';
+        exchangeHistoryList.innerHTML = '';
+        return;
+      }
+
+      if (!data.items.length) {
+        exchangeHistoryCard.style.display = 'none';
+        exchangeHistoryList.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      data.items.forEach((item) => {
+        const name = item.partner_name || 'Sherik';
+        const username = item.partner_username ? `@${item.partner_username}` : '';
+        const initial = name.trim() ? name.trim().charAt(0).toUpperCase() : 'S';
+
+        let timeText = '';
+        if (item.completed_at) {
+          const d = new Date(item.completed_at);
+          const day = `${d.getDate()}`.padStart(2, '0');
+          const month = `${d.getMonth() + 1}`.padStart(2, '0');
+          const year = d.getFullYear();
+          const hours = `${d.getHours()}`.padStart(2, '0');
+          const mins = `${d.getMinutes()}`.padStart(2, '0');
+          timeText = `${day}.${month}.${year} ${hours}:${mins}`;
+        }
+
+        html += `
+          <div class="exchange-history-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(55,65,81,0.5);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="width:32px; height:32px; border-radius:999px; background:#111827; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.9rem;">${initial}</div>
+              <div>
+                <div style="font-size:0.9rem; font-weight:500;">${name}</div>
+                ${username ? `<div style="font-size:0.8rem; opacity:0.8;">${username}</div>` : ''}
+              </div>
+            </div>
+            <div style="font-size:0.8rem; opacity:0.8; text-align:right; min-width:90px;">${timeText}</div>
+          </div>`;
+      });
+
+      exchangeHistoryList.innerHTML = html;
+      exchangeHistoryCard.style.display = 'block';
+    } catch (e) {
+      console.error('Almashish tarixini yuklash xato:', e);
+      exchangeHistoryCard.style.display = 'none';
+      exchangeHistoryList.innerHTML = '';
+    }
+  }
+
   const profileDiv = document.getElementById('profile-content');
   const slotsDiv = document.getElementById('slots-content');
   const friendsDiv = document.getElementById('friends-content');
@@ -263,6 +320,8 @@
   const exchangeOffersCard = document.getElementById('exchange-offers-card');
   const exchangeOffersEmpty = document.getElementById('exchange-offers-empty');
   const exchangeOffersList = document.getElementById('exchange-offers-list');
+  const exchangeHistoryCard = document.getElementById('exchange-history-card');
+  const exchangeHistoryList = document.getElementById('exchange-history-list');
   const exchangeSlotCard = document.getElementById('exchange-slot-card');
   const exchangeSlotList = document.getElementById('exchange-slot-list');
   const exchangeSlotCancel = document.getElementById('exchange-slot-cancel');
@@ -1401,11 +1460,14 @@
     currentTelegramId = telegramId;
 
     try {
-      const [meRes, slotsRes, friendsRes, activeChatRes] = await Promise.all([
+      const [meRes, slotsRes, friendsRes, activeChatRes, offersRes, sentRes, historyRes] = await Promise.all([
         fetch(`/api/me?telegram_id=${telegramId}`),
         fetch(`/api/slots?telegram_id=${telegramId}`),
         fetch(`/api/friends?telegram_id=${telegramId}`),
-        fetch(`/api/exchange/active_chat?telegram_id=${telegramId}`)
+        fetch(`/api/exchange/active_chat?telegram_id=${telegramId}`),
+        fetch(`/api/exchange/offers?telegram_id=${telegramId}`),
+        fetch(`/api/exchange/sent?telegram_id=${telegramId}`),
+        fetch(`/api/exchange/history?telegram_id=${telegramId}`)
       ]);
 
       // Ro'yxatdan o'tmagan foydalanuvchi

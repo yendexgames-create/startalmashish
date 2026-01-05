@@ -238,6 +238,75 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// Almashish tarixi: foydalanuvchi qatnashgan yakunlangan almashuvlar ro'yxati
+app.get('/api/exchange/history', async (req, res) => {
+  try {
+    const telegramId = parseInt(req.query.telegram_id, 10);
+    if (!telegramId) {
+      return res.status(400).json({ error: 'telegram_id query parametri kerak' });
+    }
+
+    const rows = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT e.id,
+                CASE WHEN e.user1_id = ? THEN e.user2_id ELSE e.user1_id END AS partner_id,
+                e.created_at,
+                e.deadline
+         FROM exchanges e
+         WHERE e.status = 'completed'
+           AND (e.user1_id = ? OR e.user2_id = ?)
+         ORDER BY e.id DESC
+         LIMIT 50`,
+        [telegramId, telegramId, telegramId],
+        (err, list) => {
+          if (err) return reject(err);
+          resolve(list || []);
+        }
+      );
+    });
+
+    if (!rows.length) {
+      return res.json({ ok: true, items: [] });
+    }
+
+    // Partnerlar haqida ma'lumotlarni olib kelamiz
+    const partnerIds = [...new Set(rows.map((r) => r.partner_id))];
+    const partners = await new Promise((resolve, reject) => {
+      const placeholders = partnerIds.map(() => '?').join(',');
+      db.all(
+        `SELECT telegram_id, name, username FROM users WHERE telegram_id IN (${placeholders})`,
+        partnerIds,
+        (err, list) => {
+          if (err) return reject(err);
+          resolve(list || []);
+        }
+      );
+    });
+
+    const partnerMap = {};
+    partners.forEach((p) => {
+      partnerMap[p.telegram_id] = p;
+    });
+
+    const items = rows.map((r) => {
+      const p = partnerMap[r.partner_id] || {};
+      const completedAt = r.deadline && Number.isFinite(r.deadline) && r.deadline > 0 ? r.deadline : r.created_at;
+      return {
+        exchange_id: r.id,
+        partner_id: r.partner_id,
+        partner_name: p.name || 'Sherik',
+        partner_username: p.username || null,
+        completed_at: completedAt || null
+      };
+    });
+
+    return res.json({ ok: true, items });
+  } catch (e) {
+    console.error('/api/exchange/history xato:', e);
+    return res.status(500).json({ error: 'Server xatosi' });
+  }
+});
+
 // Keldi / Kelmadi tasdiqlash
 app.post('/api/exchange/approve', async (req, res) => {
   try {
