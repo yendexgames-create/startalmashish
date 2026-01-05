@@ -175,6 +175,24 @@ function getFriendsForUser(telegramId) {
   });
 }
 
+// Ikki foydalanuvchi orasida hali tugamagan (aktiv) almashuv bor-yo'qligini tekshirish
+function findActiveExchangeBetween(user1Id, user2Id) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM exchanges
+       WHERE ((user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?))
+         AND status NOT IN ('completed', 'cancelled', 'rejected_partner')
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user1Id, user2Id, user2Id, user1Id],
+      (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      }
+    );
+  });
+}
+
 function addScreenshot(exchangeId, userId, fileId) {
   const now = Date.now();
   return new Promise((resolve, reject) => {
@@ -1237,6 +1255,15 @@ bot.on(message('web_app_data'), async (ctx) => {
         return;
       }
 
+      const existingEx = await findActiveExchangeBetween(telegramId, candidateTelegramId);
+      if (existingEx) {
+        await ctx.reply(
+          'Siz bu foydalanuvchi bilan allaqachon almashish jarayonidasiz yoki so‘rov yuborgansiz. Yangi so‘rov yaratilmadi.',
+          mainMenuKeyboard()
+        );
+        return;
+      }
+
       const exchangeId = await createExchange(telegramId, candidateTelegramId);
       activeExchanges.set(telegramId, exchangeId);
       activeExchanges.set(candidateTelegramId, exchangeId);
@@ -1630,6 +1657,12 @@ bot.action('match_yes', async (ctx) => {
     return;
   }
 
+  const existingEx = await findActiveExchangeBetween(telegramId, candidateTelegramId);
+  if (existingEx) {
+    await ctx.answerCbQuery('Bu foydalanuvchi bilan allaqachon almashish jarayonidasiz yoki so‘rov yuborgansiz.');
+    return;
+  }
+
   const exchangeId = await createExchange(telegramId, candidateTelegramId);
   activeExchanges.set(telegramId, exchangeId);
   activeExchanges.set(candidateTelegramId, exchangeId);
@@ -1922,6 +1955,12 @@ bot.action(/friend_ex_(\d+)/, async (ctx) => {
 
   if (!user || !friend || !user.main_link || !friend.main_link) {
     await ctx.answerCbQuery('Bu do‘st bilan hozircha almashish mumkin emas.');
+    return;
+  }
+
+  const existingEx = await findActiveExchangeBetween(telegramId, friendTelegramId);
+  if (existingEx) {
+    await ctx.answerCbQuery('Bu do‘st bilan allaqachon almashish jarayonidasiz yoki so‘rov yuborgansiz.');
     return;
   }
 
