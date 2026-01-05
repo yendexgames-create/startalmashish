@@ -229,17 +229,29 @@
 
   async function loadExchangeHistory(telegramId) {
     if (!exchangeHistoryCard || !exchangeHistoryList) return;
+
+    const exchangeHistoryEmpty = document.getElementById('exchange-history-empty');
+
+    // Avval kartani ko'rinadigan qilamiz, keyin ichini to'ldiramiz
+    exchangeHistoryCard.style.display = 'block';
+    exchangeHistoryList.innerHTML = '';
+    if (exchangeHistoryEmpty) {
+      exchangeHistoryEmpty.style.display = 'none';
+    }
+
     try {
       const resp = await fetch(`/api/exchange/history?telegram_id=${encodeURIComponent(telegramId)}`);
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data || !data.ok || !Array.isArray(data.items)) {
-        exchangeHistoryCard.style.display = 'none';
+        // Xatoda ham bo'sh holatni ko'rsatamiz
+        if (exchangeHistoryEmpty) exchangeHistoryEmpty.style.display = 'block';
         exchangeHistoryList.innerHTML = '';
         return;
       }
 
       if (!data.items.length) {
-        exchangeHistoryCard.style.display = 'none';
+        // Hozircha yakunlangan almashish yo'q – kartani qoldirib, faqat matn ko'rsatamiz
+        if (exchangeHistoryEmpty) exchangeHistoryEmpty.style.display = 'block';
         exchangeHistoryList.innerHTML = '';
         return;
       }
@@ -275,10 +287,10 @@
       });
 
       exchangeHistoryList.innerHTML = html;
-      exchangeHistoryCard.style.display = 'block';
+      if (exchangeHistoryEmpty) exchangeHistoryEmpty.style.display = 'none';
     } catch (e) {
       console.error('Almashish tarixini yuklash xato:', e);
-      exchangeHistoryCard.style.display = 'none';
+      if (exchangeHistoryEmpty) exchangeHistoryEmpty.style.display = 'block';
       exchangeHistoryList.innerHTML = '';
     }
   }
