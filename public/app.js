@@ -575,6 +575,24 @@
     currentChatExchangeId = exchangeId;
     hideExchangeCards();
 
+    // Har bir yangi chat ochilganda akkaunt soni formasi va keldi/kelmadi pinned zonani toza qilamiz
+    if (chatAccountsArea) {
+      chatAccountsArea.style.display = 'block';
+    }
+    if (chatAccountsSelect) {
+      chatAccountsSelect.value = '1';
+    }
+    lastAccountsCount = null;
+    currentScreenshotAccountIndex = 1;
+
+    if (chatConfirmArea) {
+      chatConfirmArea.style.display = 'none';
+      chatConfirmArea.innerHTML = '';
+    }
+    if (pendingConfirmQueue && pendingConfirmQueue.length) {
+      pendingConfirmQueue.length = 0;
+    }
+
     const name = partner && partner.name ? partner.name : 'Sherik';
 
     if (exchangeChatAvatar) {
