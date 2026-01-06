@@ -585,7 +585,7 @@ bot.on('contact', async (ctx) => {
     }
   }
   await ctx.reply(
-    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi "🧩 Web ilova" tugmasi orqali Web ilovani ochib, profil va slotlaringiz uchun linklarni to‘ldirishingiz mumkin.',
+    'Muvaffaqiyatli ro‘yxatdan o‘tdingiz! ✅\n\nEndi pastdagi "🧩 Web ilova" tugmasi orqali Web ilovani ochib, profil va slotlaringiz uchun bot linklarini kiriting.\n\nQanday almashish qilinadi?\n1. Web ilovada profil va slotlaringizni to‘ldiring.\n2. Web ilovada "Almashish" bo‘limiga kiring va "Almashishni topish" tugmasini bosing.\n3. Sizga sherikning bot(lar)i chiqadi. Botni ochib ko‘ring, agar mos bo‘lsa "Bor", mos bo‘lmasa "Keyingisi" tugmasini bosing.\n4. Ikki tomon ham rozilik bergach, "Tayyorman" tugmasini bosib chatni boshlaysiz.\n5. Chat ichida screenshot yuborish va almashishni yakunlash bo‘yicha ko‘rsatmalar ko‘rsatiladi.\n\nHoziroq "🧩 Web ilova" tugmasini bosib ishni boshlashingiz mumkin.',
     mainMenuKeyboard()
   );
 

@@ -1118,12 +1118,17 @@ app.post('/api/exchange/create', async (req, res) => {
     const candidateText =
       `${uName} siz bilan start almashmoqchi.
 
-Quyidagi linkingiz uchun sizdan start so‘ramoqda:
-${uLink}
+Bu taklif Web ilova orqali yuborildi.
 
 Davom etish uchun:
 1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.
-2. Almashish bo‘limida bu taklif tafsilotlarini ko‘rasiz va qaror qabul qilasiz.`;
+2. Web ilovada "Almashish" bo‘limiga kiring.
+3. "Takliflar" qismida ushbu foydalanuvchi kartasini toping.
+4. Botni "Botni ko‘rish" tugmasi orqali ochib, sizga mosligini tekshiring.
+5. Agar hamkorlik sizga mos bo‘lsa, Web ilovada "Bor" tugmasini bosing.
+   Agar mos bo‘lmasa yoki ishonchingiz bo‘lmasa, "Keyingisi" tugmasini bosing.
+
+Shunchaki sinab ko‘rish uchun "Bor" tugmasini bosmang – faqat rostdan almashmoqchi bo‘lsangiz bosing.`;
 
     try {
       await bot.telegram.sendMessage(candId, candidateText);
