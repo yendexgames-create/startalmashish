@@ -357,7 +357,7 @@ app.get('/api/me', async (req, res) => {
     const myBotName = extractBotNameFromLink(user.main_link);
 
     const invited = user.invited_friends_count || 0;
-    const effectiveSlots = invited >= 1 ? 3 : 1;
+    const effectiveSlots = invited >= 3 ? 3 : 1;
 
     return res.json({
       user: {

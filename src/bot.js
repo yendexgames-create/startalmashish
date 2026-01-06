@@ -414,7 +414,7 @@ bot.start(async (ctx) => {
         db.run(
           `UPDATE users
            SET invited_friends_count = invited_friends_count + 1,
-               slots = 3,
+               slots = CASE WHEN invited_friends_count >= 3 THEN 3 ELSE 1 END,
                referrer_id = COALESCE(referrer_id, ?)
            WHERE telegram_id = ?`,
           [referrerId, telegramId],
@@ -551,7 +551,7 @@ bot.on('contact', async (ctx) => {
         db.run(
           `UPDATE users
            SET invited_friends_count = invited_friends_count + 1,
-               slots = 3
+               slots = CASE WHEN invited_friends_count + 1 >= 3 THEN 3 ELSE 1 END
            WHERE telegram_id = ?`,
           [referrerId],
           (err) => {
