@@ -1690,8 +1690,13 @@
       renderSlots(slotsData || null);
       renderFriends(friendsData.friends || []);
 
-      // Taklif qilingan do'stlar (referal) ro'yxatini ham yuklaymiz
-      await loadReferrals(telegramId);
+      // Taklif qilingan do'stlar (referal) ro'yxatini ham yuklaymiz,
+      // lekin agar bu yerda xato bo'lsa, butun bosh sahifa yuklanishini to'xtatmaymiz
+      try {
+        await loadReferrals(telegramId);
+      } catch (e) {
+        console.error('loadReferrals xato:', e);
+      }
 
       // Agar oldindan chat holatidagi almashish bo'lsa, shu holatni ko'rsatamiz
       const activeChat = activeChatData && activeChatData.active ? activeChatData.active : null;
