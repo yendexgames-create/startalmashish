@@ -414,6 +414,7 @@
   const exchangeLinkTitle = document.getElementById('exchange-link-title');
   const exchangeLinkUrl = document.getElementById('exchange-link-url');
   const exchangeOpenBotBtn = document.getElementById('exchange-open-bot');
+  const exchangeBackBtn = document.getElementById('exchange-back');
   const exchangeYesBtn = document.getElementById('exchange-yes');
   const exchangeNoBtn = document.getElementById('exchange-no');
   const exchangeNextBtn = document.getElementById('exchange-next');
@@ -2362,6 +2363,13 @@
 
   if (exchangeNoCandidateBack) {
     exchangeNoCandidateBack.addEventListener('click', () => {
+      showHeroCard();
+    });
+  }
+
+  // WebApp ichidagi almashish kartasidagi "Orqaga" tugmasi
+  if (exchangeBackBtn) {
+    exchangeBackBtn.addEventListener('click', () => {
       showHeroCard();
     });
   }
