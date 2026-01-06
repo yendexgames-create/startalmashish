@@ -348,10 +348,10 @@ Tavsif: ${candidateDescription}`;
     text,
     Markup.inlineKeyboard([
       [
+        Markup.button.callback('🔙 Orqaga', 'match_back'),
         Markup.button.callback('✅ Bor', 'match_yes'),
         Markup.button.callback('⏭ Yo‘q, keyingisi', 'match_no')
-      ],
-      [Markup.button.callback('🔙 Orqaga qaytish', 'match_back')]
+      ]
     ])
   );
 }
