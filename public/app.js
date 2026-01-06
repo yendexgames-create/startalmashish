@@ -2455,6 +2455,21 @@
         return;
       }
 
+      // Agar tarixda keyingi kandidat mavjud bo'lsa, birinchi navbatda o'shanga o'tamiz
+      if (
+        exchangeCandidateHistory.length &&
+        exchangeCandidateIndex >= 0 &&
+        exchangeCandidateIndex < exchangeCandidateHistory.length - 1
+      ) {
+        exchangeCandidateIndex += 1;
+        const nextCandidate = exchangeCandidateHistory[exchangeCandidateIndex];
+        if (nextCandidate) {
+          currentExchangeCandidate = nextCandidate;
+          fillExchangeCardFromCandidate();
+          return;
+        }
+      }
+
       try {
         // Shu sessiyada ko'rilgan kandidatlar ro'yxatini backendga yuboramiz,
         // shunda ularni qayta taklif qilmaydi
