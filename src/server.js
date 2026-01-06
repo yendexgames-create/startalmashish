@@ -922,12 +922,13 @@ app.post('/api/exchange/ready', async (req, res) => {
       });
     });
 
-    const linkForOther = user.main_link || '-';
     const msg =
-      `Almashmoqchi bo'lgan odamingiz tayyor. Chatni boshlashingiz mumkin.
-
-Quyidagi link orqali sherigingiz botiga oting:
-${linkForOther}`;
+      'Almashmoqchi bo‘lgan odamingiz "Tayyorman" tugmasini bosdi. Endi chatni boshlashga tayyorsiz.\n\n' +
+      'Davom etish uchun:\n' +
+      '1. Botdagi "🧩 Web ilova" tugmasini bosing va Web ilovani oching.\n' +
+      '2. Web ilovada "Almashish" bo‘limiga kiring. Agar chat allaqachon ochilmagan bo‘lsa, shu almashuv uchun chat avtomatik ochiladi.\n' +
+      '3. Chat oynasida sherigingiz bilan kelishilgan tartibda screenshot va start almashishni yakunlang.\n\n' +
+      'Sherigingizning bot(lar)i va shartlarini Web ilova ichidagi kartadan "Botni ko‘rish" tugmasi orqali tekshirishingiz mumkin.';
 
     try {
       await bot.telegram.sendMessage(otherId, msg);

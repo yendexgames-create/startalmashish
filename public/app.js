@@ -704,6 +704,7 @@
     if (exchangeNoCandidateCard) exchangeNoCandidateCard.style.display = 'none';
     if (exchangeOffersCard) exchangeOffersCard.style.display = 'none';
     if (exchangeSentCard) exchangeSentCard.style.display = 'none';
+    if (exchangeHistoryCard) exchangeHistoryCard.style.display = 'none';
   }
 
   function showHeroCard() {
