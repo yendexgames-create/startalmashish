@@ -720,12 +720,17 @@
       activeChatPollInterval = null;
     }
 
-    currentChatExchangeId = exchangeId;
-    hideExchangeCards();
+    // Agar boshqa exchange_id bo'lsa, bu yangi chat hisoblanadi
+    if (currentChatExchangeId !== exchangeId) {
+      currentChatExchangeId = exchangeId;
+      // Yangi almashuv boshlanganida chatni boshidan yuklaymiz
+      chatLastMessageId = 0;
+      chatSessionStartAt = 0; // Filtrni o'chirib, barcha xabarlarni ko'rsatamiz
+    } else {
+      currentChatExchangeId = exchangeId;
+    }
 
-    // Har safar chat oynasi ochilganda yangi sessiya deb hisoblaymiz
-    chatLastMessageId = 0;
-    chatSessionStartAt = Date.now();
+    hideExchangeCards();
 
     // Chat faol bo'lganda pastki navbarni yashiramiz, faqat chat oynasi to'liq ko'rinsin
     const navbar = document.querySelector('.bottom-nav');
@@ -1283,14 +1288,6 @@
       if (!data || !Array.isArray(data.messages) || !data.messages.length) return;
 
       data.messages.forEach((m) => {
-        // Agar chat sessiya boshlanish vaqti ma'lum bo'lsa, undan oldingi xabarlarni ko'rsatmaymiz
-        if (chatSessionStartAt && typeof m.created_at === 'number' && m.created_at < chatSessionStartAt) {
-          if (typeof m.id === 'number' && m.id > chatLastMessageId) {
-            chatLastMessageId = m.id;
-          }
-          return;
-        }
-
         const fromId = m.from_telegram_id;
         const text = m.text || '';
         if (!text) return;
