@@ -506,6 +506,9 @@
   let currentExchangeCandidate = null;
   // WebApp almashish qidiruv sessiyasi davomida ko'rilgan kandidatlar (telegram_id lar to'plami)
   let seenExchangeCandidates = new Set();
+  // Shu sessiya davomida ketma-ket ko'rsatilgan kandidat kartalari tarixi
+  let exchangeCandidateHistory = [];
+  let exchangeCandidateIndex = -1;
   let hasExchangeCandidates = false;
   let currentChatExchangeId = null;
   let chatLastMessageId = 0;
@@ -2248,8 +2251,10 @@
       return;
     }
 
-    // Yangi qidiruv sessiyasini boshlaymiz: ko'rilgan kandidatlar ro'yxatini tozalaymiz
+    // Yangi qidiruv sessiyasini boshlaymiz: ko'rilgan kandidatlar va tarixni tozalaymiz
     seenExchangeCandidates = new Set();
+    exchangeCandidateHistory = [];
+    exchangeCandidateIndex = -1;
 
     try {
       const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
@@ -2275,9 +2280,11 @@
         description: c.description || ''
       };
 
-      // Birinchi kandidatni ham ko'rilganlar ro'yxatiga qo'shamiz
+      // Birinchi kandidatni ham ko'rilganlar ro'yxatiga va tarixga qo'shamiz
       if (currentExchangeCandidate.telegramId) {
         seenExchangeCandidates.add(currentExchangeCandidate.telegramId);
+        exchangeCandidateHistory = [currentExchangeCandidate];
+        exchangeCandidateIndex = 0;
       }
 
       if (exchangeHeroCard) {
@@ -2377,10 +2384,20 @@
     });
   }
 
-  // WebApp ichidagi almashish kartasidagi "Orqaga" tugmasi
+  // WebApp ichidagi almashish kartasidagi "Orqaga" tugmasi – shu sessiyadagi oldingi kandidatga qaytish
   if (exchangeBackBtn) {
     exchangeBackBtn.addEventListener('click', () => {
-      showHeroCard();
+      if (!exchangeCandidateHistory.length || exchangeCandidateIndex <= 0) {
+        // Oldingi kandidat yo'q – hech narsa qilmaymiz
+        return;
+      }
+
+      exchangeCandidateIndex -= 1;
+      const prev = exchangeCandidateHistory[exchangeCandidateIndex];
+      if (!prev) return;
+
+      currentExchangeCandidate = prev;
+      fillExchangeCardFromCandidate();
     });
   }
 
@@ -2472,6 +2489,16 @@
           // Yangi kandidatdan ham ko'rilganlar to'plamiga qo'shamiz
           if (currentExchangeCandidate.telegramId) {
             seenExchangeCandidates.add(currentExchangeCandidate.telegramId);
+            // Tarixga qo'shamiz: agar orqadan keyin oldinga o'tayotgan bo'lsak,
+            // joriy indeksdan keyingi elementlarni kesib tashlaymiz
+            if (exchangeCandidateIndex < 0) {
+              exchangeCandidateHistory = [currentExchangeCandidate];
+              exchangeCandidateIndex = 0;
+            } else {
+              exchangeCandidateHistory = exchangeCandidateHistory.slice(0, exchangeCandidateIndex + 1);
+              exchangeCandidateHistory.push(currentExchangeCandidate);
+              exchangeCandidateIndex = exchangeCandidateHistory.length - 1;
+            }
           }
 
           if (exchangeCard) {
