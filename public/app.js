@@ -504,6 +504,8 @@
   let currentTelegramId = null;
   let tutorialStep = 0;
   let currentExchangeCandidate = null;
+  // WebApp almashish qidiruv sessiyasi davomida ko'rilgan kandidatlar (telegram_id lar to'plami)
+  let seenExchangeCandidates = new Set();
   let hasExchangeCandidates = false;
   let currentChatExchangeId = null;
   let chatLastMessageId = 0;
@@ -2246,6 +2248,9 @@
       return;
     }
 
+    // Yangi qidiruv sessiyasini boshlaymiz: ko'rilgan kandidatlar ro'yxatini tozalaymiz
+    seenExchangeCandidates = new Set();
+
     try {
       const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
       if (!resp.ok) {
@@ -2269,6 +2274,11 @@
         botUrl: c.main_link || '',
         description: c.description || ''
       };
+
+      // Birinchi kandidatni ham ko'rilganlar ro'yxatiga qo'shamiz
+      if (currentExchangeCandidate.telegramId) {
+        seenExchangeCandidates.add(currentExchangeCandidate.telegramId);
+      }
 
       if (exchangeHeroCard) {
         exchangeHeroCard.style.display = 'none';
@@ -2429,7 +2439,14 @@
       }
 
       try {
-        const resp = await fetch(`/api/exchange/match?telegram_id=${currentTelegramId}`);
+        // Shu sessiyada ko'rilgan kandidatlar ro'yxatini backendga yuboramiz,
+        // shunda ularni qayta taklif qilmaydi
+        const excludeIds = Array.from(seenExchangeCandidates || []).join(',');
+        const qs = excludeIds
+          ? `telegram_id=${currentTelegramId}&exclude=${encodeURIComponent(excludeIds)}`
+          : `telegram_id=${currentTelegramId}`;
+
+        const resp = await fetch(`/api/exchange/match?${qs}`);
         if (resp.ok) {
           const data = await resp.json();
           const c = data && data.candidate ? data.candidate : null;
@@ -2451,6 +2468,11 @@
             botUrl: c.main_link || '',
             description: c.description || ''
           };
+
+          // Yangi kandidatdan ham ko'rilganlar to'plamiga qo'shamiz
+          if (currentExchangeCandidate.telegramId) {
+            seenExchangeCandidates.add(currentExchangeCandidate.telegramId);
+          }
 
           if (exchangeCard) {
             exchangeCard.classList.remove('exchange-slide-out-left', 'exchange-slide-in-right');

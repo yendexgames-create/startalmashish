@@ -1154,6 +1154,15 @@ app.get('/api/exchange/match', async (req, res) => {
 
     const currentMainLink = user.main_link ? user.main_link.trim() : null;
 
+    // Frontenddan keladigan, shu sessiyada allaqachon ko'rilgan kandidatlar ro'yxati (virgulla ajratilgan idlar)
+    const excludeParam = (req.query.exclude || '').toString();
+    const excludeSet = new Set(
+      excludeParam
+        .split(',')
+        .map((v) => parseInt(v, 10))
+        .filter((v) => !Number.isNaN(v))
+    );
+
     db.all(
       'SELECT * FROM users WHERE main_link IS NOT NULL AND telegram_id != ?',
       [telegramId],
@@ -1173,6 +1182,9 @@ app.get('/api/exchange/match', async (req, res) => {
 
           // Asosiy linki ham aynan bir xil bo'lmasin
           if (currentMainLink && row.main_link && row.main_link.trim() === currentMainLink) return false;
+
+          // Frontend sessiyasi davomida allaqachon ko'rilgan kandidatlar
+          if (excludeSet.has(row.telegram_id)) return false;
 
           return true;
         });
