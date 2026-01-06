@@ -506,6 +506,8 @@
   let hasExchangeCandidates = false;
   let currentChatExchangeId = null;
   let chatLastMessageId = 0;
+  // Hozirgi chat sessiyasi boshlangan vaqt (ms). Shu vaqtdan oldingi xabarlar ko'rsatilmaydi.
+  let chatSessionStartAt = 0;
   let chatPollInterval = null;
   let chatTimerInterval = null;
   let activeChatPollInterval = null;
@@ -680,10 +682,6 @@
           if (tg) tg.showAlert(msgText);
           return;
         }
-
-        const idx = data.account_index || currentScreenshotAccountIndex || 1;
-        const text = `[SCREENSHOT ${idx}] ${data.url}`;
-        appendSelfChatMessage(text);
       } catch (e) {
         console.error('/api/exchange/screenshot POST xato:', e);
         if (tg) tg.showAlert('Screenshot yuborishda xatolik yuz berdi. Keyinroq urinib ko\'ring.');
@@ -718,6 +716,10 @@
 
     currentChatExchangeId = exchangeId;
     hideExchangeCards();
+
+    // Har safar chat oynasi ochilganda yangi sessiya deb hisoblaymiz
+    chatLastMessageId = 0;
+    chatSessionStartAt = Date.now();
 
     // Chat faol bo'lganda pastki navbarni yashiramiz, faqat chat oynasi to'liq ko'rinsin
     const navbar = document.querySelector('.bottom-nav');
@@ -1275,6 +1277,14 @@
       if (!data || !Array.isArray(data.messages) || !data.messages.length) return;
 
       data.messages.forEach((m) => {
+        // Agar chat sessiya boshlanish vaqti ma'lum bo'lsa, undan oldingi xabarlarni ko'rsatmaymiz
+        if (chatSessionStartAt && typeof m.created_at === 'number' && m.created_at < chatSessionStartAt) {
+          if (typeof m.id === 'number' && m.id > chatLastMessageId) {
+            chatLastMessageId = m.id;
+          }
+          return;
+        }
+
         const fromId = m.from_telegram_id;
         const text = m.text || '';
         if (!text) return;
